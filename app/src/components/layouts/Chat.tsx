@@ -1,13 +1,12 @@
 import {
   useState,
   useRef,
-  ReactNode,
+  type ReactNode,
   cloneElement,
   isValidElement,
   useEffect,
 } from "react";
 import type React from "react";
-import { motion } from "framer-motion";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
 import { useActions } from "@/hooks/useActions";
 import { useWebSocket } from "@/providers/WebSocketProvider";
@@ -70,7 +69,7 @@ export default function Chat() {
   ];
 
   return (
-    <div className="flex flex-row justify-center pb-20 h-dvh bg-background">
+    <div className="flex flex-row justify-center pb-20 h-full bg-background">
       <div className="flex flex-col justify-between gap-4">
         <div
           ref={messagesContainerRef}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import * as React from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -8,14 +8,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
+  SidebarRail,
+  SidebarSeparator as SidebarSeparator2,
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
 import { useStore } from "../../store/useStore";
 import {
-  IconChevronLeft,
-  IconChevronRight,
   IconPackage,
   IconShoppingCart,
   IconCurrencyEuro,
@@ -23,30 +22,44 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import { userApi } from "../../lib/api";
-import { InventoryModal } from "../modals/InventoryModal";
-import { OrdersModal } from "../modals/OrdersModal";
-import { ExpensesModal } from "../modals/ExpensesModal";
-import { GroupModal } from "../modals/GroupModal";
-import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+import { User } from "./User";
 import packageJson from "../../../package.json";
+import { cn } from "../../lib/utils";
 
-function Separator() {
-  return <SidebarSeparator className="!mx-0" />;
+function SidebarSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof SidebarSeparator2>) {
+  return <SidebarSeparator2 className={cn("!mx-0", className)} {...props} />;
 }
 
-function AppSidebar() {
-  const { currentUser, currentGroup, setCurrentUser, setCurrentGroup } =
-    useStore();
+export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  inventoryOpen: boolean;
+  setInventoryOpen: (open: boolean) => void;
+  ordersOpen: boolean;
+  setOrdersOpen: (open: boolean) => void;
+  expensesOpen: boolean;
+  setExpensesOpen: (open: boolean) => void;
+  groupOpen: boolean;
+  setGroupOpen: (open: boolean) => void;
+}
 
+export function AppSidebar({
+  inventoryOpen,
+  setInventoryOpen,
+  ordersOpen,
+  setOrdersOpen,
+  expensesOpen,
+  setExpensesOpen,
+  groupOpen,
+  setGroupOpen,
+  ...props
+}: AppSidebarProps) {
+  const { currentGroup, setCurrentUser, setCurrentGroup } = useStore();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const [inventoryOpen, setInventoryOpen] = useState(false);
-  const [ordersOpen, setOrdersOpen] = useState(false);
-  const [expensesOpen, setExpensesOpen] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
-
-  useEffect(() => {
+  React.useEffect(() => {
     // Load user session on mount
     userApi.getSession().then((session) => {
       setCurrentUser(session.user);
@@ -54,77 +67,13 @@ function AppSidebar() {
     });
   }, [setCurrentUser, setCurrentGroup]);
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-3 flex-shrink-0">
-        <div className="flex items-center justify-between w-full gap-2">
-          {currentUser ? (
-            <>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Avatar className="flex-shrink-0">
-                  <AvatarImage
-                    src={currentUser.avatar}
-                    alt={currentUser.name}
-                  />
-                  <AvatarFallback>
-                    {getInitials(currentUser.name)}
-                  </AvatarFallback>
-                </Avatar>
-                {!isCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">
-                      {currentUser.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {currentUser.email}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <SidebarTrigger className="h-10 w-10 flex-shrink-0">
-                {isCollapsed ? (
-                  <IconChevronRight className="size-5" />
-                ) : (
-                  <IconChevronLeft className="size-5" />
-                )}
-              </SidebarTrigger>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Avatar className="flex-shrink-0">
-                  <AvatarFallback>?</AvatarFallback>
-                </Avatar>
-                {!isCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground">
-                      Loading...
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Please wait
-                    </div>
-                  </div>
-                )}
-              </div>
-              <SidebarTrigger className="h-10 w-10 flex-shrink-0">
-                {isCollapsed ? (
-                  <IconChevronRight className="size-5" />
-                ) : (
-                  <IconChevronLeft className="size-5" />
-                )}
-              </SidebarTrigger>
-            </>
-          )}
+    <Sidebar collapsible="offcanvas" {...props}>
+      <SidebarHeader>
+        <div className="flex flex-row justify-end items-center w-full">
+          <SidebarTrigger />
         </div>
+        <User />
       </SidebarHeader>
 
       <SidebarContent>
@@ -145,7 +94,7 @@ function AppSidebar() {
           </SidebarGroup>
         )}
 
-        <Separator />
+        <SidebarSeparator />
 
         {/* Navigation */}
         <SidebarGroup>
@@ -155,7 +104,7 @@ function AppSidebar() {
                 tooltip="Inventory"
                 onClick={() => setInventoryOpen(true)}
               >
-                <IconPackage className="size-5" />
+                <IconPackage className="size-4" />
                 <span>Inventory</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -164,7 +113,7 @@ function AppSidebar() {
                 tooltip="Orders"
                 onClick={() => setOrdersOpen(true)}
               >
-                <IconShoppingCart className="size-5" />
+                <IconShoppingCart className="size-4" />
                 <span>Orders</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -173,7 +122,7 @@ function AppSidebar() {
                 tooltip="Expenses"
                 onClick={() => setExpensesOpen(true)}
               >
-                <IconCurrencyEuro className="size-5" />
+                <IconCurrencyEuro className="size-4" />
                 <span>Expenses</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -181,7 +130,7 @@ function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="flex-shrink-0 !px-0">
+      <SidebarFooter className="!px-0">
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -192,21 +141,27 @@ function AppSidebar() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
-        <Separator />
-        <div className="p-2">
+        <div
+          className={cn(
+            "transition-all duration-200 overflow-hidden",
+            isCollapsed ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
+          )}
+        >
+          <SidebarSeparator />
+        </div>
+        <div
+          className={cn(
+            "px-2 py-1.5 transition-all duration-200 overflow-hidden",
+            isCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-20 opacity-100"
+          )}
+        >
           <div className="text-xs text-center text-muted-foreground font-medium">
             Yuyabre v{packageJson.version}
           </div>
         </div>
       </SidebarFooter>
 
-      {/* Modals */}
-      <InventoryModal open={inventoryOpen} onOpenChange={setInventoryOpen} />
-      <OrdersModal open={ordersOpen} onOpenChange={setOrdersOpen} />
-      <ExpensesModal open={expensesOpen} onOpenChange={setExpensesOpen} />
-      <GroupModal open={groupOpen} onOpenChange={setGroupOpen} />
+      <SidebarRail />
     </Sidebar>
   );
 }
-
-export default AppSidebar;
