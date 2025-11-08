@@ -124,7 +124,13 @@ export const Message = ({
           </div>
         ) : (
           <div className="text-foreground flex flex-col gap-4">
-            <Markdown>{content}</Markdown>
+            {content ? (
+              <Markdown>{content}</Markdown>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground italic">
+                <span className="animate-pulse">Thinking...</span>
+              </div>
+            )}
           </div>
         )}
       </div>

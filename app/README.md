@@ -40,6 +40,18 @@ cd app
 pnpm install
 ```
 
+### Environment Variables
+
+Create a `.env` file in the `app` directory with the following:
+
+```env
+# API Base URL
+# Can be a full URL (e.g., https://8e6cf2395260.ngrok-free.app) or a relative path (e.g., /api)
+VITE_API_BASE_URL=https://8e6cf2395260.ngrok-free.app
+```
+
+If `VITE_API_BASE_URL` is not set, it defaults to an empty string (relative path), which will use the same origin as the frontend.
+
 ### Development
 
 ```bash
@@ -110,6 +122,23 @@ The order placement feature uses a generator function to simulate streaming upda
 - TanStack Query DevTools are available in development
 - The UI is responsive and supports light/dark mode
 - Components use Radix UI for accessibility
+
+## Agent Command Streaming API
+
+The app uses WebSocket to stream agent command responses. The WebSocket endpoint is:
+
+```
+ws://localhost:8000/agent/command/stream
+```
+
+The streaming API:
+- Uses WebSocket for bidirectional communication
+- Sends command and user_id as JSON after connection opens
+- Receives messages with `type` field: `chunk`, `done`, or `error`
+- Streams responses in real-time as they're generated
+- Automatically handles connection cleanup
+- Supports both absolute URLs and relative paths via `VITE_API_BASE_URL`
+- Automatically converts HTTP/HTTPS URLs to ws:///wss:// protocols
 
 ## Next Steps
 
