@@ -1,5 +1,5 @@
 import type React from "react";
-import { ChatInput } from "@/components/basic/ChatInput";
+import { ChatInput } from "@/components/layouts/Chat/ChatInput";
 
 interface ChatInputFormProps {
   inputValue: string;
@@ -16,7 +16,7 @@ export function ChatInputForm({
 }: ChatInputFormProps) {
   return (
     <form
-      className="flex flex-col gap-2 relative items-center"
+      className="flex flex-col gap-2 items-center fixed bottom-0 w-full h-16 bg-background"
       onSubmit={onSubmit}
     >
       <ChatInput ref={inputRef} value={inputValue} onChange={onInputChange} />
