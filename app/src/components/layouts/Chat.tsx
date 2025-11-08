@@ -1,7 +1,8 @@
-import { useState, useRef, ReactNode, cloneElement, isValidElement } from "react";
+import { useState, useRef, ReactNode, cloneElement, isValidElement, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
 import { useActions } from "@/hooks/useActions";
+import { useWebSocket } from "@/providers/WebSocketProvider";
 import { Message } from "@/components/ui/Message";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ChatInput } from "@/components/ui/ChatInput";
@@ -9,6 +10,7 @@ import { MessageRole, MessageType } from "@/types/chat";
 
 export default function Chat() {
   const { sendMessage } = useActions();
+  const { onMessage } = useWebSocket();
 
   const [input, setInput] = useState<string>("");
   const [messages, setMessages] = useState<Array<ReactNode>>([]);
@@ -16,6 +18,25 @@ export default function Chat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
+
+  // Listen for incoming messages via WebSocket
+  useEffect(() => {
+    const unsubscribe = onMessage((message) => {
+      setMessages((msgs) => [
+        ...msgs,
+        <Message
+          key={message.id}
+          id={message.id}
+          role={message.role as MessageRole}
+          type={message.type as MessageType}
+          content={message.content}
+          orderData={message.orderData}
+        />,
+      ]);
+    });
+
+    return unsubscribe;
+  }, [onMessage]);
 
   const suggestedActions = [
     {
@@ -91,8 +112,8 @@ export default function Chat() {
                       content={action.action}
                     />,
                   ]);
-                  const response: ReactNode = await sendMessage(action.action);
-                  setMessages((messages) => [...messages, response]);
+                  // Send message - response will come via WebSocket
+                  await sendMessage(action.action);
                 }}
               />
             ))}
@@ -117,8 +138,8 @@ export default function Chat() {
             ]);
             setInput("");
 
-            const response: ReactNode = await sendMessage(currentInput);
-            setMessages((messages) => [...messages, response]);
+            // Send message - response will come via WebSocket
+            await sendMessage(currentInput);
           }}
         >
           <ChatInput ref={inputRef} value={input} onChange={setInput} />

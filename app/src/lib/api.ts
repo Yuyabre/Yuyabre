@@ -1,5 +1,6 @@
 import type { InventoryItem, Expense, StreamChunk } from "../types";
 import type { Order, OrderData } from "../types/orders";
+import type { User, Group, UserSession } from "../types/users";
 
 // Simulate network delay
 const delay = (ms = 500): Promise<void> =>
@@ -338,3 +339,78 @@ export async function* placeOrderWithStream(
   order.splitwiseExpenseId = expense.id;
   yield { type: "complete", order, expense, progress: 100 };
 }
+
+// Mock user/group data
+const mockUser: User = {
+  id: "user-1",
+  name: "John Doe",
+  email: "john@example.com",
+  isAdmin: true,
+};
+
+const mockGroup: Group = {
+  id: "group-1",
+  name: "Main Street Flat",
+  members: [
+    {
+      id: "user-1",
+      name: "John Doe",
+      email: "john@example.com",
+      isAdmin: true,
+      joinedAt: "2024-01-01T00:00:00Z",
+    },
+    {
+      id: "user-2",
+      name: "Jane Smith",
+      email: "jane@example.com",
+      isAdmin: false,
+      joinedAt: "2024-01-15T00:00:00Z",
+    },
+    {
+      id: "user-3",
+      name: "Bob Johnson",
+      email: "bob@example.com",
+      isAdmin: false,
+      joinedAt: "2024-02-01T00:00:00Z",
+    },
+  ],
+  createdAt: "2024-01-01T00:00:00Z",
+};
+
+// User/Group API
+export const userApi = {
+  getSession: async (): Promise<UserSession> => {
+    await delay(300);
+    return {
+      user: mockUser,
+      group: mockGroup,
+      token: "mock-token",
+    };
+  },
+
+  addFlatmate: async (email: string): Promise<Group> => {
+    await delay(500);
+    const newFlatmate: Group["members"][0] = {
+      id: `user-${Date.now()}`,
+      name: email.split("@")[0],
+      email,
+      isAdmin: false,
+      joinedAt: new Date().toISOString(),
+    };
+    mockGroup.members.push(newFlatmate);
+    return { ...mockGroup };
+  },
+};
+
+// Chat API - only for sending messages
+export const chatApi = {
+  sendMessage: async (message: string): Promise<{ success: boolean; messageId: string }> => {
+    await delay(200);
+    // In production, this would send the message to the server
+    // The server will process it and send responses via WebSocket
+    return {
+      success: true,
+      messageId: `msg-${Date.now()}`,
+    };
+  },
+};

@@ -124,17 +124,7 @@ export const Message = ({
           </div>
         ) : (
           <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4">
-            {/* Check if this is an approval message and render with icon */}
-            {content.includes("has been approved") ? (
-              <div className="flex items-start gap-2">
-                <IconCheck className="size-5 text-zinc-600 dark:text-zinc-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <Markdown>{content}</Markdown>
-                </div>
-              </div>
-            ) : (
-              <Markdown>{content}</Markdown>
-            )}
+            <Markdown>{content}</Markdown>
           </div>
         )}
       </div>

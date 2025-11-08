@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { ViewId } from "../types";
 import type { IMessage } from "@/types/chat";
+import type { User, Group } from "@/types/users";
 
 interface Store {
   // Chat state
@@ -12,9 +12,11 @@ interface Store {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 
-  // Active view
-  activeView: ViewId;
-  setActiveView: (view: ViewId) => void;
+  // User and group state
+  currentUser: User | null;
+  currentGroup: Group | null;
+  setCurrentUser: (user: User | null) => void;
+  setCurrentGroup: (group: Group | null) => void;
 }
 
 const useStore = create<Store>((set) => ({
@@ -33,9 +35,11 @@ const useStore = create<Store>((set) => ({
       sidebarCollapsed: !state.sidebarCollapsed,
     })),
 
-  // Active view
-  activeView: "chat",
-  setActiveView: (view) => set({ activeView: view }),
+  // User and group state
+  currentUser: null,
+  currentGroup: null,
+  setCurrentUser: (user) => set({ currentUser: user }),
+  setCurrentGroup: (group) => set({ currentGroup: group }),
 }));
 
 export { useStore };
