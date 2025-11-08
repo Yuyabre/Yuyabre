@@ -1,13 +1,12 @@
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
-import { Button } from "./Button";
+import type { ReactNode } from "react";
+import { Button } from "../ui/button";
 
 interface ActionButtonProps {
   index: number;
   title: string;
   label: string;
   onClick: () => void;
-  children?: ReactNode;
 }
 
 export function ActionButton({
@@ -15,7 +14,6 @@ export function ActionButton({
   title,
   label,
   onClick,
-  children,
 }: ActionButtonProps) {
   return (
     <motion.div
@@ -26,7 +24,7 @@ export function ActionButton({
     >
       <Button
         variant="outline"
-        size="3"
+        size="lg"
         onClick={onClick}
         className="w-full text-left flex flex-col items-start h-auto py-3"
       >

@@ -1,4 +1,4 @@
-import { Modal } from "../ui/Modal";
+import { Modal } from "../basic/Modal";
 
 interface OrdersModalProps {
   open: boolean;
@@ -8,10 +8,9 @@ interface OrdersModalProps {
 export function OrdersModal({ open, onOpenChange }: OrdersModalProps) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Orders">
-      <div className="text-theme-tertiary">
+      <div className="text-muted-foreground">
         Orders view will be implemented here.
       </div>
     </Modal>
   );
 }
-

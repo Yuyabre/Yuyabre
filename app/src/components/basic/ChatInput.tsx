@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { Label } from "./Label";
+import { Label } from "../ui/label";
 
 interface ChatInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
@@ -20,7 +20,7 @@ export const ChatInput = forwardRef<HTMLInputElement, ChatInputProps>(
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`bg-theme-tertiary rounded-md px-2 py-1.5 w-full outline-none text-theme-primary md:max-w-[500px] max-w-[calc(100dvw-32px)] border border-theme-primary focus:ring-2 focus:ring-accent ${
+          className={`bg-muted rounded-md px-2 py-1.5 w-full outline-none text-foreground md:max-w-[500px] max-w-[calc(100dvw-32px)] border border-border focus:ring-2 focus:ring-ring ${
             className || ""
           }`}
           placeholder="Send a message..."

@@ -302,40 +302,40 @@ export async function* placeOrderWithStream(
 ): AsyncGenerator<StreamChunk, void, unknown> {
   yield { type: "status", message: "Processing order...", progress: 0 };
   await delay(300);
-
+  
   yield { type: "status", message: "Searching for products...", progress: 25 };
   await delay(400);
-
+  
   yield { type: "status", message: "Adding items to cart...", progress: 50 };
   await delay(500);
-
+  
   yield {
     type: "status",
     message: "Placing order with Thuisbezorgd...",
     progress: 75,
   };
   await delay(600);
-
+  
   const order = await ordersApi.create(orderData);
   yield { type: "order", data: order, progress: 90 };
-
+  
   yield { type: "status", message: "Updating inventory...", progress: 95 };
   await delay(300);
-
+  
   yield {
     type: "status",
     message: "Creating Splitwise expense...",
     progress: 98,
   };
   await delay(400);
-
+  
   const expense = await expensesApi.create({
     description: `Grocery Order #${order.id}`,
     amount: order.total,
     splitAmount: order.total / 2, // Mock: split between 2 flatmates
     orderId: order.id,
   });
-
+  
   order.splitwiseExpenseId = expense.id;
   yield { type: "complete", order, expense, progress: 100 };
 }

@@ -1,12 +1,19 @@
-import { useState, useRef, ReactNode, cloneElement, isValidElement, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  ReactNode,
+  cloneElement,
+  isValidElement,
+  useEffect,
+} from "react";
 import type React from "react";
 import { motion } from "framer-motion";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
 import { useActions } from "@/hooks/useActions";
 import { useWebSocket } from "@/providers/WebSocketProvider";
-import { Message } from "@/components/ui/Message";
-import { ActionButton } from "@/components/ui/ActionButton";
-import { ChatInput } from "@/components/ui/ChatInput";
+import { Message } from "@/components/basic/Message";
+import { ActionButton } from "@/components/basic/ActionButton";
+import { ChatInput } from "@/components/basic/ChatInput";
 import { MessageRole, MessageType } from "@/types/chat";
 
 export default function Chat() {
@@ -63,7 +70,7 @@ export default function Chat() {
   ];
 
   return (
-    <div className="flex flex-row justify-center pb-20 h-dvh bg-theme-primary">
+    <div className="flex flex-row justify-center pb-20 h-dvh bg-background">
       <div className="flex flex-col justify-between gap-4">
         <div
           ref={messagesContainerRef}
@@ -72,22 +79,27 @@ export default function Chat() {
           {messages.map((message, index) => {
             // If it's a Message component, clone it and add the approval callback
             if (isValidElement(message) && message.type === Message) {
-              return cloneElement(message as React.ReactElement<React.ComponentProps<typeof Message>>, {
-                key: message.key || index,
-                onOrderApproved: (approvalMessage: string) => {
-                  // Add a follow-up message with the approval response
-                  setMessages((msgs) => [
-                    ...msgs,
-                    <Message
-                      key={Date.now()}
-                      id={Date.now().toString()}
-                      role={MessageRole.ASSISTANT}
-                      type={MessageType.TEXT}
-                      content={approvalMessage}
-                    />,
-                  ]);
-                },
-              });
+              return cloneElement(
+                message as React.ReactElement<
+                  React.ComponentProps<typeof Message>
+                >,
+                {
+                  key: message.key || index,
+                  onOrderApproved: (approvalMessage: string) => {
+                    // Add a follow-up message with the approval response
+                    setMessages((msgs) => [
+                      ...msgs,
+                      <Message
+                        key={Date.now()}
+                        id={Date.now().toString()}
+                        role={MessageRole.ASSISTANT}
+                        type={MessageType.TEXT}
+                        content={approvalMessage}
+                      />,
+                    ]);
+                  },
+                }
+              );
             }
             return message;
           })}

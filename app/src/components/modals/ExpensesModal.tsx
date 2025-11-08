@@ -1,4 +1,4 @@
-import { Modal } from "../ui/Modal";
+import { Modal } from "../basic/Modal";
 
 interface ExpensesModalProps {
   open: boolean;
@@ -8,10 +8,9 @@ interface ExpensesModalProps {
 export function ExpensesModal({ open, onOpenChange }: ExpensesModalProps) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Expenses">
-      <div className="text-theme-tertiary">
+      <div className="text-muted-foreground">
         Expenses view will be implemented here.
       </div>
     </Modal>
   );
 }
-
