@@ -1,0 +1,106 @@
+import { useState, useRef, ReactNode } from "react";
+import { motion } from "framer-motion";
+import { useScrollToBottom } from "@/hooks/useScrollToBottom";
+import { useActions } from "@/hooks/useActions";
+import { Message } from "@/components/ui/Message";
+import { ActionButton } from "@/components/ui/ActionButton";
+import { ChatInput } from "@/components/ui/ChatInput";
+import { MessageRole } from "@/types/chat";
+
+export default function Chat() {
+  const { sendMessage } = useActions();
+
+  const [input, setInput] = useState<string>("");
+  const [messages, setMessages] = useState<Array<ReactNode>>([]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [messagesContainerRef, messagesEndRef] =
+    useScrollToBottom<HTMLDivElement>();
+
+  const suggestedActions = [
+    {
+      title: "What's in",
+      label: "the inventory?",
+      action: "What's in the inventory?",
+    },
+    {
+      title: "Order",
+      label: "2 liters of milk",
+      action: "Order 2 liters of milk",
+    },
+    {
+      title: "Show me",
+      label: "pending expenses",
+      action: "Show me pending expenses",
+    },
+    {
+      title: "Check",
+      label: "low stock items",
+      action: "Check low stock items",
+    },
+  ];
+
+  return (
+    <div className="flex flex-row justify-center pb-20 h-dvh bg-white dark:bg-zinc-900">
+      <div className="flex flex-col justify-between gap-4">
+        <div
+          ref={messagesContainerRef}
+          className="flex flex-col gap-3 h-full w-dvw items-center overflow-y-scroll"
+        >
+          {messages.map((message) => message)}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px] mb-4">
+          {messages.length === 0 &&
+            suggestedActions.map((action, index) => (
+              <ActionButton
+                key={index}
+                index={index}
+                title={action.title}
+                label={action.label}
+                onClick={async () => {
+                  setMessages((messages) => [
+                    ...messages,
+                    <Message
+                      key={messages.length}
+                      id={Date.now().toString()}
+                      role={MessageRole.USER}
+                      content={action.action}
+                    />,
+                  ]);
+                  const response: ReactNode = await sendMessage(action.action);
+                  setMessages((messages) => [...messages, response]);
+                }}
+              />
+            ))}
+        </div>
+
+        <form
+          className="flex flex-col gap-2 relative items-center"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!input.trim()) return;
+
+            const currentInput = input;
+            setMessages((messages) => [
+              ...messages,
+              <Message
+                key={messages.length}
+                id={Date.now().toString()}
+                role={MessageRole.USER}
+                content={currentInput}
+              />,
+            ]);
+            setInput("");
+
+            const response: ReactNode = await sendMessage(currentInput);
+            setMessages((messages) => [...messages, response]);
+          }}
+        >
+          <ChatInput ref={inputRef} value={input} onChange={setInput} />
+        </form>
+      </div>
+    </div>
+  );
+}

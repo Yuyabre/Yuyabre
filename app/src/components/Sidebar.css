@@ -1,0 +1,249 @@
+.sidebar {
+  width: 260px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition: width 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 64px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 64px;
+}
+
+.sidebar-title h2 {
+  margin: 0;
+  font-size: 1.25em;
+  font-weight: 600;
+  color: inherit;
+}
+
+.sidebar-toggle {
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.sidebar-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+  font-size: 0.9375em;
+  font-weight: 400;
+}
+
+.sidebar-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-item.active {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar.collapsed .sidebar-item {
+  justify-content: center;
+  padding: 0.625rem;
+}
+
+.sidebar-icon {
+  font-size: 1.125em;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  line-height: 1;
+}
+
+.sidebar-label {
+  flex: 1;
+}
+
+.sidebar.collapsed .sidebar-label {
+  display: none;
+}
+
+.sidebar-settings {
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.settings-title {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin: 0 0 0.25rem 0;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.switch-label {
+  font-size: 0.875em;
+  opacity: 0.7;
+  cursor: pointer;
+  flex: 1;
+}
+
+.switch-wrapper {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 0.2s;
+  border-radius: 22px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.switch-input:checked + .switch-slider {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.switch-input:checked + .switch-slider:before {
+  transform: translateX(18px);
+}
+
+.switch-input:disabled + .switch-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sidebar-settings-collapsed {
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-icon-button {
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.sidebar-icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: light) {
+  .sidebar {
+    background-color: rgba(0, 0, 0, 0.015);
+    border-right-color: rgba(0, 0, 0, 0.08);
+  }
+
+  .sidebar-header {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+  }
+
+  .sidebar-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+
+  .sidebar-item.active {
+    background-color: rgba(0, 0, 0, 0.06);
+  }
+
+  .sidebar-settings {
+    border-top-color: rgba(0, 0, 0, 0.08);
+  }
+
+  .switch-slider {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .switch-input:checked + .switch-slider {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  .sidebar-settings-collapsed {
+    border-top-color: rgba(0, 0, 0, 0.08);
+  }
+}
