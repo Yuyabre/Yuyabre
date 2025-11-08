@@ -32,19 +32,31 @@ async def process_command_stream(request: CommandRequest):
     """
     async def generate_sse():
         """Generate Server-Sent Events from agent stream."""
-        import json
         try:
             async for chunk in controller.process_command_stream(request):
-                # Format as SSE: data: <json-encoded-content>\n\n
-                # Using JSON encoding for proper handling of special characters
-                encoded_chunk = json.dumps(chunk)
-                yield f"data: {encoded_chunk}\n\n"
+                # Format as SSE: data: <content>\n\n
+                # Handle newlines by splitting and prefixing each line with "data: "
+                if '\n' in chunk:
+                    lines = chunk.split('\n')
+                    for line in lines[:-1]:  # All but the last line
+                        yield f"data: {line}\n"
+                    # Last line (might be empty if chunk ends with \n)
+                    yield f"data: {lines[-1]}\n\n"
+                else:
+                    # No newlines, simple case
+                    yield f"data: {chunk}\n\n"
             # Send end marker
             yield "data: [DONE]\n\n"
         except Exception as e:
             # Send error as SSE event
-            error_msg = json.dumps(f"Error: {str(e)}")
-            yield f"data: {error_msg}\n\n"
+            error_msg = f"Error: {str(e)}"
+            if '\n' in error_msg:
+                lines = error_msg.split('\n')
+                for line in lines[:-1]:
+                    yield f"data: {line}\n"
+                yield f"data: {lines[-1]}\n\n"
+            else:
+                yield f"data: {error_msg}\n\n"
             yield "data: [DONE]\n\n"
     
     return StreamingResponse(
