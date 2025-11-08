@@ -270,23 +270,25 @@ Core actions the agent can perform:
 ### Workflow 1: Text-Based Order (Sprint Focus)
 
 ```
-User (CLI): "Order 2 liters of milk"
+User: "Order 2 liters of milk"
 ↓
 Agent: Processes text command via LLM
 ↓
 Agent: Checks Thuisbezorgd for milk options
 ↓
-Agent: Places order automatically
+Agent: Sends text message on common whatsapp group and confirm if others need it (incase milk has been tagged as a shared item before or if multiple people have ordered it based on the inventory)
+↓
+Agent: Places order automatically (based on how many people asked for it)
 ↓
 Agent: Send message to group chat (if implemented) about delivery
 ↓
 Agent: Check delivery status. (Repeat until done)
 ↓
-Agent: Updates MongoDB inventory (+2 liters milk) (if success)
+Agent: Updates MongoDB inventory (+X liters milk) (if success)
 ↓
 Agent: Creates Splitwise expense (modular module)
 ↓
-Agent: Responds: "Order placed! 2L milk added to inventory. Splitwise expense created."
+Agent: Responds: "Order placed! XL milk added to inventory. Splitwise expense created."
 ```
 
 ### Workflow 2: Manual Inventory Update (Sprint Focus)
@@ -392,9 +394,9 @@ Flatmates: Add/remove items via chat
 ### Backend
 
 - **Language:** Python (recommended for LLM integration) or Node.js
-- **Framework:** FastAPI (Python) or Express.js (Node.js) - minimal setup
+- **Framework:** FastAPI (Python) - minimal setup
 - **Database:** **MongoDB** (primary database for inventory and orders)
-- **LLM Integration:** OpenAI API (GPT-4/3.5) for text command processing
+- **LLM Integration:** OpenAI API (GPT-5) for text command processing
 - ~~**Voice Processing:** Whisper API~~ (Deferred)
 
 ### Integrations (Sprint)
