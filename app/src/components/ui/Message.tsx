@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { IconRobotFace, IconUser, IconCheck } from "@tabler/icons-react";
 import { Markdown } from "./Markdown";
 import { OrderCard } from "./OrderCard";
-import { IMessage, MessageType } from "@/types/chat";
+import { IMessage, MessageRole, MessageType } from "@/types/chat";
 import { ordersApi } from "@/lib/api";
 
 export const TextStreamMessage = ({ content }: { content: string }) => {
@@ -15,12 +15,12 @@ export const TextStreamMessage = ({ content }: { content: string }) => {
       initial={{ y: 5, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
     >
-      <div className="size-[24px] flex flex-col justify-center items-center flex-shrink-0 text-zinc-400">
+      <div className="size-[24px] flex flex-col justify-center items-center flex-shrink-0 text-theme-muted">
         <IconRobotFace />
       </div>
 
       <div className="flex flex-col gap-1 w-full">
-        <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4">
+        <div className="text-theme-primary flex flex-col gap-4">
           <Markdown>{content}</Markdown>
         </div>
       </div>
@@ -91,15 +91,15 @@ export const Message = ({
       animate={{ y: 0, opacity: 1 }}
       key={id}
     >
-      <div className="size-[24px] flex flex-col justify-center items-center flex-shrink-0 text-zinc-400">
-        {role === "assistant" ? <IconRobotFace /> : <IconUser />}
+      <div className="size-[24px] flex flex-col justify-center items-center flex-shrink-0 text-theme-muted">
+        {role === MessageRole.ASSISTANT ? <IconRobotFace /> : <IconUser />}
       </div>
 
       <div className="flex flex-col gap-1 w-full">
         {type === MessageType.ORDER && currentOrderData ? (
           <div className="flex flex-col gap-4">
             {content && (
-              <div className="text-zinc-800 dark:text-zinc-300">
+              <div className="text-theme-primary">
                 <Markdown>{content}</Markdown>
               </div>
             )}
@@ -123,7 +123,7 @@ export const Message = ({
             />
           </div>
         ) : (
-          <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4">
+          <div className="text-theme-primary flex flex-col gap-4">
             <Markdown>{content}</Markdown>
           </div>
         )}

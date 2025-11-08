@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ReactNode } from "react";
+import { Button } from "./Button";
 
 interface ActionButtonProps {
   index: number;
@@ -23,13 +24,15 @@ export function ActionButton({
       transition={{ delay: 0.01 * index }}
       className={index > 1 ? "hidden sm:block" : "block"}
     >
-      <button
+      <Button
+        variant="outline"
+        size="3"
         onClick={onClick}
-        className="w-full text-left border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-300 rounded-lg p-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex flex-col"
+        className="w-full text-left flex flex-col items-start h-auto py-3"
       >
         <span className="font-medium">{title}</span>
-        <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
-      </button>
+        <span className="text-sm opacity-70">{label}</span>
+      </Button>
     </motion.div>
   );
 }

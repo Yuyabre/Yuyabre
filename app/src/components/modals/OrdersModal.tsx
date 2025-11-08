@@ -8,7 +8,7 @@ interface OrdersModalProps {
 export function OrdersModal({ open, onOpenChange }: OrdersModalProps) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Orders">
-      <div className="text-zinc-600 dark:text-zinc-400">
+      <div className="text-theme-tertiary">
         Orders view will be implemented here.
       </div>
     </Modal>

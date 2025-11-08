@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { IconCheck, IconClock, IconShoppingCart, IconLoader2 } from "@tabler/icons-react";
+import { Separator } from "./Separator";
 
 interface OrderCardProps {
   id: string;
@@ -54,15 +55,15 @@ export const OrderCard = ({
   const getStatusColor = () => {
     switch (status) {
       case "pending":
-        return "text-yellow-600 dark:text-yellow-400";
+        return "text-status-yellow";
       case "preparing":
-        return "text-blue-600 dark:text-blue-400";
+        return "text-status-blue";
       case "delivering":
-        return "text-purple-600 dark:text-purple-400";
+        return "text-status-purple";
       case "delivered":
-        return "text-green-600 dark:text-green-400";
+        return "text-status-green";
       default:
-        return "text-zinc-600 dark:text-zinc-400";
+        return "text-theme-tertiary";
     }
   };
 
@@ -85,18 +86,18 @@ export const OrderCard = ({
     <motion.div
       initial={{ y: 5, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="w-full border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 overflow-hidden"
+      className="w-full border border-theme-primary rounded-lg bg-theme-primary overflow-hidden"
     >
       {/* Header */}
-      <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+      <div className="px-4 py-3 bg-theme-secondary border-b border-theme-primary flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <IconShoppingCart className="size-5 text-zinc-600 dark:text-zinc-400" />
-            <span className="font-medium text-zinc-800 dark:text-zinc-300">
+            <IconShoppingCart className="size-5 text-theme-tertiary" />
+            <span className="font-medium text-theme-primary">
               {store}
             </span>
           </div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-7">
+          <span className="text-xs text-theme-tertiary ml-7">
             via {service}
           </span>
         </div>
@@ -113,13 +114,13 @@ export const OrderCard = ({
               key={index}
               className="flex items-center justify-between text-sm"
             >
-              <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                <span className="text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center gap-2 text-theme-secondary">
+                <span className="text-theme-tertiary">
                   {item.quantity}x
                 </span>
                 <span>{item.name}</span>
               </div>
-              <span className="text-zinc-800 dark:text-zinc-200 font-medium">
+              <span className="text-theme-primary font-medium">
                 €{(item.price * item.quantity).toFixed(2)}
               </span>
             </div>
@@ -127,24 +128,26 @@ export const OrderCard = ({
         </div>
 
         {/* Price Breakdown */}
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-3 space-y-1.5">
-          <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="pt-3 space-y-1.5">
+          <Separator className="mb-3" />
+          <div className="flex items-center justify-between text-sm text-theme-tertiary">
             <span>Subtotal</span>
             <span>€{subtotal.toFixed(2)}</span>
           </div>
           {deliveryFee > 0 && (
-            <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+            <div className="flex items-center justify-between text-sm text-theme-tertiary">
               <span>Delivery Fee</span>
               <span>€{deliveryFee.toFixed(2)}</span>
             </div>
           )}
           {serviceFee > 0 && (
-            <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+            <div className="flex items-center justify-between text-sm text-theme-tertiary">
               <span>Service Fee</span>
               <span>€{serviceFee.toFixed(2)}</span>
             </div>
           )}
-          <div className="flex items-center justify-between text-base font-semibold text-zinc-800 dark:text-zinc-200 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <Separator className="mt-2" />
+          <div className="flex items-center justify-between text-base font-semibold text-theme-primary pt-2">
             <span>Total</span>
             <span>€{total.toFixed(2)}</span>
           </div>
@@ -152,8 +155,9 @@ export const OrderCard = ({
       </div>
 
       {/* Delivery Time & Actions */}
-      <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <div className="px-4 py-3 bg-theme-secondary flex items-center justify-between relative">
+        <Separator className="absolute top-0 left-0 right-0" />
+        <div className="flex items-center gap-2 text-sm text-theme-tertiary">
           <IconClock className="size-4" />
           <span>Est. delivery: {estimatedDeliveryTime}</span>
         </div>
@@ -161,7 +165,7 @@ export const OrderCard = ({
           <button
             onClick={handleApprove}
             disabled={isApproving}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-theme-inverse text-theme-inverse rounded-md text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isApproving ? (
               <>

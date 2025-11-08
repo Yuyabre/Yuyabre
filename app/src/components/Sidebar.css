@@ -236,26 +236,7 @@
   margin-left: auto;
 }
 
-.sidebar-user-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.875em;
-  flex-shrink: 0;
-}
-
-.sidebar-user-avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
+/* Avatar styles are now handled by Radix UI Avatar component */
 
 .sidebar-user-details {
   flex: 1;

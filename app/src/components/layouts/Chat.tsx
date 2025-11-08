@@ -1,4 +1,5 @@
 import { useState, useRef, ReactNode, cloneElement, isValidElement, useEffect } from "react";
+import type React from "react";
 import { motion } from "framer-motion";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
 import { useActions } from "@/hooks/useActions";
@@ -62,7 +63,7 @@ export default function Chat() {
   ];
 
   return (
-    <div className="flex flex-row justify-center pb-20 h-dvh bg-white dark:bg-zinc-900">
+    <div className="flex flex-row justify-center pb-20 h-dvh bg-theme-primary">
       <div className="flex flex-col justify-between gap-4">
         <div
           ref={messagesContainerRef}
@@ -71,7 +72,7 @@ export default function Chat() {
           {messages.map((message, index) => {
             // If it's a Message component, clone it and add the approval callback
             if (isValidElement(message) && message.type === Message) {
-              return cloneElement(message, {
+              return cloneElement(message as React.ReactElement<React.ComponentProps<typeof Message>>, {
                 key: message.key || index,
                 onOrderApproved: (approvalMessage: string) => {
                   // Add a follow-up message with the approval response

@@ -8,7 +8,7 @@ interface ExpensesModalProps {
 export function ExpensesModal({ open, onOpenChange }: ExpensesModalProps) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Expenses">
-      <div className="text-zinc-600 dark:text-zinc-400">
+      <div className="text-theme-tertiary">
         Expenses view will be implemented here.
       </div>
     </Modal>
