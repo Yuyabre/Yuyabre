@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryApi, ordersApi, expensesApi } from './api';
-import type { InventoryItem, Order, Expense, OrderData } from '../types';
+import type { InventoryItem, Expense } from '../types';
+import type { Order, OrderData } from '../types/orders';
 
 // Inventory queries
 export const useInventory = () => {

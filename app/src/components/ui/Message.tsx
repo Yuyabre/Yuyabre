@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { IconRobotFace, IconUser } from "@tabler/icons-react";
+import { IconRobotFace, IconUser, IconCheck } from "@tabler/icons-react";
 import { Markdown } from "./Markdown";
-import { IMessage } from "@/types/chat";
+import { OrderCard } from "./OrderCard";
+import { IMessage, MessageType } from "@/types/chat";
+import { ordersApi } from "@/lib/api";
 
 export const TextStreamMessage = ({ content }: { content: string }) => {
   return (
@@ -25,7 +28,62 @@ export const TextStreamMessage = ({ content }: { content: string }) => {
   );
 };
 
-export const Message = ({ id, role, content, timestamp }: IMessage) => {
+interface MessageProps extends IMessage {
+  onOrderApproved?: (
+    message: string,
+    updatedOrder: IMessage["orderData"]
+  ) => void;
+}
+
+export const Message = ({
+  id,
+  role,
+  type,
+  content,
+  timestamp,
+  orderData,
+  onOrderApproved,
+}: MessageProps) => {
+  const [currentOrderData, setCurrentOrderData] = useState(orderData);
+
+  const handleApprove = async () => {
+    if (!currentOrderData) return;
+
+    try {
+      // Convert orderData to Order format for the API
+      const orderDataForApi = {
+        service: currentOrderData.service,
+        store: currentOrderData.store,
+        items: currentOrderData.items,
+        total: currentOrderData.total,
+      };
+
+      const { order, message } = await ordersApi.approve(
+        currentOrderData.id,
+        orderDataForApi
+      );
+
+      // Update the order data with the new status
+      const updatedOrderData = {
+        ...currentOrderData,
+        status: order.status as
+          | "pending"
+          | "preparing"
+          | "delivering"
+          | "delivered",
+      };
+      setCurrentOrderData(updatedOrderData);
+
+      // Notify parent to add a follow-up message
+      if (onOrderApproved) {
+        onOrderApproved(message, updatedOrderData);
+      }
+    } catch (error) {
+      console.error("Failed to approve order:", error);
+      // You could show an error message here
+    }
+  };
+
   return (
     <motion.div
       className={`flex flex-row gap-4 px-4 w-full md:w-[500px] md:px-0 first-of-type:pt-20`}
@@ -38,9 +96,47 @@ export const Message = ({ id, role, content, timestamp }: IMessage) => {
       </div>
 
       <div className="flex flex-col gap-1 w-full">
-        <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4">
-          <Markdown>{content}</Markdown>
-        </div>
+        {type === MessageType.ORDER && currentOrderData ? (
+          <div className="flex flex-col gap-4">
+            {content && (
+              <div className="text-zinc-800 dark:text-zinc-300">
+                <Markdown>{content}</Markdown>
+              </div>
+            )}
+            <OrderCard
+              id={currentOrderData.id}
+              service={currentOrderData.service}
+              store={currentOrderData.store}
+              items={currentOrderData.items}
+              subtotal={currentOrderData.subtotal}
+              deliveryFee={currentOrderData.deliveryFee}
+              serviceFee={currentOrderData.serviceFee}
+              total={currentOrderData.total}
+              estimatedDeliveryTime={currentOrderData.estimatedDeliveryTime}
+              status={currentOrderData.status}
+              onApprove={handleApprove}
+              onStatusUpdate={(newStatus) => {
+                setCurrentOrderData((prev) =>
+                  prev ? { ...prev, status: newStatus } : undefined
+                );
+              }}
+            />
+          </div>
+        ) : (
+          <div className="text-zinc-800 dark:text-zinc-300 flex flex-col gap-4">
+            {/* Check if this is an approval message and render with icon */}
+            {content.includes("has been approved") ? (
+              <div className="flex items-start gap-2">
+                <IconCheck className="size-5 text-zinc-600 dark:text-zinc-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <Markdown>{content}</Markdown>
+                </div>
+              </div>
+            ) : (
+              <Markdown>{content}</Markdown>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );

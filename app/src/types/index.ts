@@ -10,23 +10,6 @@ export interface InventoryItem {
   lastUpdated?: string;
 }
 
-export interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-}
-
-export interface Order {
-  id: string;
-  timestamp: string;
-  service: string;
-  items: OrderItem[];
-  total: number;
-  deliveryTime: string | null;
-  status: "pending" | "preparing" | "delivering" | "delivered";
-  splitwiseExpenseId: string | null;
-}
-
 export interface Expense {
   id: string;
   description: string;
@@ -37,10 +20,7 @@ export interface Expense {
   createdAt: string;
 }
 
-export interface OrderData {
-  items: OrderItem[];
-  total: number;
-}
+import type { Order } from "./orders";
 
 export type StreamChunk =
   | { type: "status"; message: string; progress: number }

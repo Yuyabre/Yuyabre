@@ -1,11 +1,11 @@
-import { useState, useRef, ReactNode } from "react";
+import { useState, useRef, ReactNode, cloneElement, isValidElement } from "react";
 import { motion } from "framer-motion";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
 import { useActions } from "@/hooks/useActions";
 import { Message } from "@/components/ui/Message";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ChatInput } from "@/components/ui/ChatInput";
-import { MessageRole } from "@/types/chat";
+import { MessageRole, MessageType } from "@/types/chat";
 
 export default function Chat() {
   const { sendMessage } = useActions();
@@ -47,7 +47,28 @@ export default function Chat() {
           ref={messagesContainerRef}
           className="flex flex-col gap-3 h-full w-dvw items-center overflow-y-scroll"
         >
-          {messages.map((message) => message)}
+          {messages.map((message, index) => {
+            // If it's a Message component, clone it and add the approval callback
+            if (isValidElement(message) && message.type === Message) {
+              return cloneElement(message, {
+                key: message.key || index,
+                onOrderApproved: (approvalMessage: string) => {
+                  // Add a follow-up message with the approval response
+                  setMessages((msgs) => [
+                    ...msgs,
+                    <Message
+                      key={Date.now()}
+                      id={Date.now().toString()}
+                      role={MessageRole.ASSISTANT}
+                      type={MessageType.TEXT}
+                      content={approvalMessage}
+                    />,
+                  ]);
+                },
+              });
+            }
+            return message;
+          })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -66,6 +87,7 @@ export default function Chat() {
                       key={messages.length}
                       id={Date.now().toString()}
                       role={MessageRole.USER}
+                      type={MessageType.TEXT}
                       content={action.action}
                     />,
                   ]);
@@ -89,6 +111,7 @@ export default function Chat() {
                 key={messages.length}
                 id={Date.now().toString()}
                 role={MessageRole.USER}
+                type={MessageType.TEXT}
                 content={currentInput}
               />,
             ]);
