@@ -4,12 +4,13 @@ Ordering Service - Integration with Thuisbezorgd for grocery ordering.
 NOTE: This is a skeleton implementation. The actual integration will depend on
 whether Thuisbezorgd provides an API or requires web scraping.
 """
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from loguru import logger
 
 from models.order import Order, OrderItem, OrderStatus
 from config import settings
+from utils.cache import get_order_cache, cached_query
 
 
 class OrderingService:
@@ -25,7 +26,18 @@ class OrderingService:
         self.base_url = settings.thuisbezorgd_api_url
         self.email = settings.thuisbezorgd_email
         self.password = settings.thuisbezorgd_password
-        logger.info("Ordering service initialized")
+        self.cache = get_order_cache()
+        logger.info("Ordering service initialized with cache")
+    
+    async def _invalidate_cache(self) -> None:
+        """Invalidate all order cache entries."""
+        await self.cache.invalidate("order")
+
+    def _log_db_query(self, operation: str, **details: Any) -> None:
+        """
+        Log MongoDB queries executed through the ordering service.
+        """
+        logger.debug("[MongoDB] orders.{} | {}", operation, details)
     
     async def search_products(self, query: str) -> List[Dict]:
         """
@@ -137,6 +149,17 @@ class OrderingService:
             order.calculate_total()
             
             # Save order to database
+            self._log_db_query(
+                "insert_one",
+                payload={
+                    "order_id": order.order_id,
+                    "items": [
+                        {"name": item["name"], "quantity": item["quantity"]}
+                        for item in items
+                    ],
+                    "created_by": created_by,
+                },
+            )
             await order.insert()
             
             # PLACEHOLDER: Actually place order on Thuisbezorgd
@@ -146,7 +169,16 @@ class OrderingService:
             # For now, just mark as confirmed
             order.status = OrderStatus.CONFIRMED
             order.external_order_id = "TB_" + order.order_id[:8]
+            self._log_db_query(
+                "update_one",
+                filters={"order_id": order.order_id},
+                updates={
+                    "status": order.status.value,
+                    "external_order_id": order.external_order_id,
+                },
+            )
             await order.save()
+            await self._invalidate_cache()
             
             logger.info(
                 f"Order created successfully: {order.order_id} "
@@ -158,6 +190,7 @@ class OrderingService:
             logger.error(f"Failed to create order: {e}")
             return None
     
+    @cached_query("order", get_order_cache)
     async def get_order_status(self, order_id: str) -> Optional[OrderStatus]:
         """
         Check the status of an order.
@@ -170,6 +203,7 @@ class OrderingService:
             
         TODO: Implement actual status checking from Thuisbezorgd
         """
+        self._log_db_query("find_one", filters={"order_id": order_id})
         order = await Order.find_one(Order.order_id == order_id)
         if not order:
             logger.warning(f"Order not found: {order_id}")
@@ -195,6 +229,7 @@ class OrderingService:
         Returns:
             Updated Order object if successful, None otherwise
         """
+        self._log_db_query("find_one", filters={"order_id": order_id})
         order = await Order.find_one(Order.order_id == order_id)
         if not order:
             logger.warning(f"Order not found: {order_id}")
@@ -202,7 +237,13 @@ class OrderingService:
         
         old_status = order.status
         order.status = new_status
+        self._log_db_query(
+            "update_one",
+            filters={"order_id": order_id},
+            updates={"status": new_status.value},
+        )
         await order.save()
+        await self._invalidate_cache()
         
         logger.info(f"Order {order_id} status updated: {old_status} -> {new_status}")
         return order
@@ -219,6 +260,7 @@ class OrderingService:
             
         TODO: Implement actual order cancellation with Thuisbezorgd
         """
+        self._log_db_query("find_one", filters={"order_id": order_id})
         order = await Order.find_one(Order.order_id == order_id)
         if not order:
             logger.warning(f"Order not found: {order_id}")
@@ -231,11 +273,18 @@ class OrderingService:
         # PLACEHOLDER: Actually cancel order with Thuisbezorgd
         
         order.status = OrderStatus.CANCELLED
+        self._log_db_query(
+            "update_one",
+            filters={"order_id": order_id},
+            updates={"status": OrderStatus.CANCELLED.value},
+        )
         await order.save()
+        await self._invalidate_cache()
         
         logger.info(f"Order cancelled: {order_id}")
         return True
     
+    @cached_query("order", get_order_cache)
     async def get_order_history(self, limit: int = 20) -> List[Order]:
         """
         Get recent order history.
@@ -246,6 +295,10 @@ class OrderingService:
         Returns:
             List of recent Orders
         """
+        self._log_db_query(
+            "find_all",
+            filters={"sort": "-timestamp", "limit": limit},
+        )
         orders = await Order.find_all().sort("-timestamp").limit(limit).to_list()
         return orders
 

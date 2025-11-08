@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str
-    openai_model: str = Field(default="gpt-5-nano")
+    openai_model: str = Field(default="gpt-5-mini")
     openai_base_url: Optional[str] = Field(
         default="",
         alias="openai_proxy_url",
