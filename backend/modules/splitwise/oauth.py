@@ -22,7 +22,8 @@ class SplitwiseOAuthService:
     """
     
     # Temporary storage for request tokens (in production, use Redis or database)
-    _request_tokens: Dict[str, Tuple[str, str]] = {}
+    # Format: {request_token: (user_id, request_token_secret, callback_url)}
+    _request_tokens: Dict[str, Tuple[str, str, str]] = {}
     
     def __init__(self):
         """Initialize OAuth service with consumer credentials."""
@@ -46,12 +47,13 @@ class SplitwiseOAuthService:
             logger.debug(f"Splitwise OAuth configured - Consumer Key: {self.consumer_key[:10]}...")
         return configured
     
-    async def get_authorization_url(self, user_id: str) -> Optional[str]:
+    async def get_authorization_url(self, user_id: str, callback_url: str) -> Optional[str]:
         """
         Get the authorization URL for a user to connect their Splitwise account.
         
         Args:
             user_id: Internal user ID
+            callback_url: Callback URL where Splitwise will redirect after authorization
             
         Returns:
             Authorization URL if successful, None otherwise
@@ -61,7 +63,8 @@ class SplitwiseOAuthService:
             return None
         
         logger.info(f"Starting OAuth flow for user {user_id}")
-        logger.debug("Callback URL will be determined by Splitwise app settings")
+        logger.debug(f"Callback URL provided: {callback_url}")
+        logger.debug("Note: In OAuth 1.0, callback URL is typically set in Splitwise app settings")
         
         try:
             # Verify user exists
@@ -147,8 +150,8 @@ class SplitwiseOAuthService:
                 return None
             
             # Store tokens temporarily (keyed by request token, not user_id, since we'll get user_id in callback)
-            self._request_tokens[request_token] = (user_id, request_token_secret)
-            logger.debug(f"Stored request token for user {user_id}. Total stored tokens: {len(self._request_tokens)}")
+            self._request_tokens[request_token] = (user_id, request_token_secret, callback_url)
+            logger.debug(f"Stored request token for user {user_id} with callback_url: {callback_url}. Total stored tokens: {len(self._request_tokens)}")
             
             # Get authorization URL
             base_authorization_url = "https://secure.splitwise.com/oauth/authorize"
@@ -192,8 +195,8 @@ class SplitwiseOAuthService:
                 logger.debug(f"Available tokens: {list(self._request_tokens.keys())[:5]}...")
                 return None, False
             
-            user_id, request_token_secret = self._request_tokens.pop(oauth_token)
-            logger.debug(f"Retrieved request token secret for user {user_id}")
+            user_id, request_token_secret, callback_url = self._request_tokens.pop(oauth_token)
+            logger.debug(f"Retrieved request token secret for user {user_id} (callback_url: {callback_url})")
             
             # Create OAuth1 session with request token
             logger.debug("Creating OAuth1Session with request token for access token exchange")

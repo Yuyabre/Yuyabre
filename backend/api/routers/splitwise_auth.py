@@ -3,6 +3,7 @@ Router for Splitwise OAuth authentication endpoints.
 """
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from api.controllers.splitwise_auth_controller import SplitwiseAuthController
 
@@ -11,18 +12,29 @@ router = APIRouter(prefix="/auth/splitwise", tags=["Splitwise Auth"])
 controller = SplitwiseAuthController()
 
 
+class SplitwiseCallbackRequest(BaseModel):
+    """Request model for Splitwise OAuth callback."""
+    user_id: str
+    oauth_token: str
+    oauth_verifier: str
+
+
 @router.get("/authorize")
-async def authorize(user_id: str = Query(...)):
+async def authorize(
+    user_id: str = Query(...),
+    callback_url: str = Query(..., description="Callback URL for OAuth redirect")
+):
     """
     Get authorization URL for connecting Splitwise account.
     
     Args:
         user_id: Internal user ID
+        callback_url: Callback URL where Splitwise will redirect after authorization
         
     Returns:
         Authorization URL
     """
-    return await controller.get_authorization_url(user_id)
+    return await controller.get_authorization_url(user_id, callback_url)
 
 
 @router.get("/callback")
@@ -117,6 +129,27 @@ async def callback(
     """
     
     return HTMLResponse(content=html_content)
+
+
+@router.post("")
+async def handle_callback_post(request: SplitwiseCallbackRequest):
+    """
+    Handle OAuth callback from frontend.
+    
+    This endpoint receives OAuth token and verifier from the frontend
+    and exchanges them for access tokens, storing them in the database.
+    
+    Args:
+        request: Callback request with user_id, oauth_token, and oauth_verifier
+        
+    Returns:
+        Success message
+    """
+    return await controller.handle_callback_post(
+        request.user_id,
+        request.oauth_token,
+        request.oauth_verifier
+    )
 
 
 @router.get("/status/{user_id}")
