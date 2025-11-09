@@ -7,7 +7,6 @@ import { SidebarProvider, SidebarInset } from "./components/ui/sidebar";
 import "./App.css";
 import { Toaster } from "sonner";
 import { InventoryModal } from "./components/modals/InventoryModal";
-import { ExpensesModal } from "./components/modals/ExpensesModal";
 import { OrdersModal } from "./components/modals/OrdersModal";
 import { HouseholdModal } from "./components/modals/HouseholdModal";
 import { HouseholdOnboardingModal } from "./components/modals/HouseholdOnboardingModal";
@@ -22,7 +21,6 @@ import { useGetHousehold, useGetUser, useSplitwiseStatus } from "./lib/queries";
 function App() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [expensesOpen, setExpensesOpen] = useState(false);
   const [householdOpen, setHouseholdOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -157,8 +155,6 @@ function App() {
             setInventoryOpen={setInventoryOpen}
             ordersOpen={ordersOpen}
             setOrdersOpen={setOrdersOpen}
-            expensesOpen={expensesOpen}
-            setExpensesOpen={setExpensesOpen}
             householdOpen={householdOpen}
             setHouseholdOpen={setHouseholdOpen}
             settingsOpen={settingsOpen}
@@ -174,7 +170,6 @@ function App() {
         <Toaster position="top-right" richColors />
         <InventoryModal open={inventoryOpen} onOpenChange={setInventoryOpen} />
         <OrdersModal open={ordersOpen} onOpenChange={setOrdersOpen} />
-        <ExpensesModal open={expensesOpen} onOpenChange={setExpensesOpen} />
         <HouseholdModal open={householdOpen} onOpenChange={setHouseholdOpen} />
         <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
         {currentUser && !isLoadingUser && (
@@ -195,7 +190,7 @@ function App() {
             {splitwiseCompleted &&
               !currentUser.household_id &&
               !isLoadingHousehold && (
-          <HouseholdOnboardingModal open={hasPromptedHousehold} />
+                <HouseholdOnboardingModal open={hasPromptedHousehold} />
               )}
           </>
         )}

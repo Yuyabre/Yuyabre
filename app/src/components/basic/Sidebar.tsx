@@ -19,7 +19,6 @@ import { useStore } from "../../store/useStore";
 import {
   IconPackage,
   IconShoppingCart,
-  IconCurrencyEuro,
   IconUsers,
   IconSettings,
   IconLogout,
@@ -57,8 +56,6 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   setInventoryOpen: (open: boolean) => void;
   ordersOpen: boolean;
   setOrdersOpen: (open: boolean) => void;
-  expensesOpen: boolean;
-  setExpensesOpen: (open: boolean) => void;
   householdOpen: boolean;
   setHouseholdOpen: (open: boolean) => void;
   settingsOpen: boolean;
@@ -70,8 +67,6 @@ export function AppSidebar({
   setInventoryOpen,
   ordersOpen,
   setOrdersOpen,
-  expensesOpen,
-  setExpensesOpen,
   householdOpen,
   setHouseholdOpen,
   settingsOpen,
@@ -221,16 +216,6 @@ export function AppSidebar({
               >
                 <IconShoppingCart className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>Orders</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Expenses"
-                onClick={() => setExpensesOpen(true)}
-                className="group hover:text-primary"
-              >
-                <IconCurrencyEuro className="size-4 text-primary/80 group-hover:text-primary" />
-                <span>Expenses</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

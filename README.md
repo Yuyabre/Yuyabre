@@ -1,124 +1,38 @@
-# Yuyabre - Shared Flat Grocery Management Agent
+# Yuyabre - Prosus AI Hackathon 2025
 
-An intelligent agent system designed to automate grocery management for shared flats and groups. The system handles inventory tracking, automatic ordering through Thuisbezorgd, expense splitting via Splitwise, and provides a text-based interface for natural language commands.
+Yuyabre is our hackathon prototype for an AI roommate that keeps the shared pantry balanced without nagging anyone. The agent watches inventory, negotiates grocery orders, and settles the bill instantly, all through natural language instructions.
 
-## 🎯 Current Sprint Goal (1.5 Days)
+## Why It Matters
 
-Build a functional text-based agent that can autonomously order groceries, track inventory in MongoDB, and automatically split expenses via Splitwise.
+- **Hackathon challenge**: build a lifestyle agent that delivers real-world automation in under 1.5 days.
+- **Problem**: shared apartments lose time and money to poor inventory tracking, forgotten orders, and messy expense splitting.
+- **Solution**: a text-first agent that automates the full loop, while monitoring stock, deciding what to buy, ordering it, updating the inventory database, and logging the cost.
 
-## ✨ Core Features
+## How the Agent Works
 
-### ✅ In Development
+- **Conversation first**: users type simple requests (`"We’re out of oats, restock please"`); the agent plans actions via LLM reasoning.
+- **Contextual memory**: MongoDB keeps real-time inventory plus household preferences.
+- **Order automation**: fulfilment happens through a Thuisbezorgd integration with configurable vendor profiles (mocked due to time and physical constraints (i.e. partners-only APIs))
+- **Fair cost sharing**: every order pushes an expense to Splitwise with the right participants and notes.
 
-- **MongoDB Inventory System** - Real-time inventory tracking with CRUD operations
-- **Modular Splitwise Integration** - Automatic expense splitting after orders
-- **Autonomous Grocery Ordering** - Order placement through Thuisbezorgd
-- **Text-Based Agent Interface** - CLI with natural language processing
+## Tech Snapshot
 
-### 🔮 Future Features
+- FastAPI backend orchestrating actions and calling external services
+- React + Vite chat interface tailored for fast demo flows
+- MongoDB Atlas, Splitwise API, Thuisbezorgd ordering bridge
+- OpenAI GPT-5 powering intent parsing and decision logic
 
-- Voice input (Whisper API)
-- Picture/OCR receipt scanning
-- WhatsApp notifications
-- Calendar integration
-- Learning/prediction algorithms
-- Web UI
+## Try It in the Demo Booth
 
-## 🏗️ Project Structure
+1. Clone the repo: `git clone https://github.com/brewcoua/Yuyabre`
+2. In backend, copy `.env.example` to `.env` and drop in OpenAI, Splitwise, and Mongo credentials
+3. Similarly, in app, copy `.env.example` to `.env` and edit the api url if needed
+4. Launch both the app and the backend
 
-```
-Yuyabre/
-├── inventory/      # MongoDB inventory module
-├── splitwise/      # Modular Splitwise integration
-├── ordering/       # Thuisbezorgd integration
-├── agent/          # Core agent logic
-├── cli/            # Text interface
-└── IDEA.md         # Detailed project documentation
-```
+## Pitch Highlights
 
-## 🚀 Quick Start
+- End-to-end automation of a real group task, ready for hackathon judges
+- Modular connectors let us swap vendors or finance platforms in future sprints
+- Focus on agentic features, not re-inventing the wheel (e.g. expenses management)
 
-### Prerequisites
-
-- Python 3.8+ or Node.js 16+
-- MongoDB (local or remote)
-- Splitwise API credentials
-- OpenAI API key (for LLM)
-- Thuisbezorgd account (for ordering)
-
-### Setup
-
-1. Clone the repository
-2. Install dependencies
-3. Configure environment variables (see `.env.example`)
-4. Set up MongoDB
-5. Run the agent
-
-```bash
-# Example (Python)
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python cli/main.py
-```
-
-## 📋 Usage Examples
-
-### Order Groceries
-
-```
-User: "Order 2 liters of milk"
-Agent: Places order → Updates inventory → Creates Splitwise expense
-```
-
-### Update Inventory
-
-```
-User: "Add 5 eggs to inventory"
-Agent: Updates MongoDB inventory
-```
-
-### Query Inventory
-
-```
-User: "What's in the inventory?"
-Agent: Returns formatted inventory list
-```
-
-## 🛠️ Technology Stack
-
-- **Backend:** Python (FastAPI) or Node.js (Express.js)
-- **Database:** MongoDB
-- **LLM:** OpenAI API (GPT-4/3.5)
-- **Integrations:**
-  - Splitwise API
-  - Thuisbezorgd (API or web scraping)
-
-## 📚 Documentation
-
-- **[IDEA.md](./IDEA.md)** - Complete project documentation, architecture, and workflows
-- **[GITHUB_ISSUES.md](./GITHUB_ISSUES.md)** - Detailed GitHub issues for kanban board
-
-## 🎯 Development Status
-
-**Current Phase:** Sprint (1.5 days)
-
-- [x] Project structure design
-- [ ] MongoDB setup and schema
-- [ ] Inventory CRUD module
-- [ ] Splitwise integration
-- [ ] Thuisbezorgd integration
-- [ ] Agent orchestration
-- [ ] End-to-end testing
-
-## 🤝 Contributing
-
-This is a sprint project. See [IDEA.md](./IDEA.md) for detailed development phases and [GITHUB_ISSUES.md](./GITHUB_ISSUES.md) for task breakdown.
-
-## 📝 License
-
-[Add license information]
-
----
-
-**Note:** This project is in active development. See [IDEA.md](./IDEA.md) for the complete project vision and roadmap.
+Let us know if you’d like to run the live demo or peek at the decision traces!
