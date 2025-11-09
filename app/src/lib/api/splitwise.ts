@@ -1,12 +1,4 @@
-import type {
-  CreateHouseholdRequest,
-  Household,
-  JoinHouseholdRequest,
-  LoginRequest,
-  SignupRequest,
-  UpdateHouseholdRequest,
-  User,
-} from "@/types/users";
+import type { SplitwiseGroup } from "@/types/users";
 import { getApiBaseUrl } from "../utils";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -95,84 +87,16 @@ const request = async <T>(
   return JSON.parse(text) as T;
 };
 
-export const authApi = {
-  signup: (payload: SignupRequest) =>
-    request<User>("/auth/signup", {
-      method: "POST",
-      body: payload,
-    }),
-
-  login: (payload: LoginRequest) =>
-    request<User>("/auth/login", {
-      method: "POST",
-      body: payload,
-    }),
-
-  getUser: (userId: string) =>
-    request<User>(`/auth/users/${encodeURIComponent(userId)}`),
-
-  createHousehold: (userId: string, payload: CreateHouseholdRequest) =>
-    request<Household>(`/auth/users/${encodeURIComponent(userId)}/households`, {
-      method: "POST",
-      body: payload,
-    }),
-
-  joinHousehold: (userId: string, payload: JoinHouseholdRequest) =>
-    request<unknown>(
-      `/auth/users/${encodeURIComponent(userId)}/join-household`,
+export const splitwiseApi = {
+  searchGroups: (userId: string, query: string) =>
+    request<{ groups: SplitwiseGroup[] }>(
+      `/splitwise/groups/search?user_id=${encodeURIComponent(userId)}`,
       {
         method: "POST",
-        body: payload,
+        body: { query },
       }
     ),
-
-  getHousehold: (householdId: string) =>
-    request<Household>(`/auth/households/${encodeURIComponent(householdId)}`),
-
-  updateHousehold: (
-    userId: string,
-    householdId: string,
-    payload: UpdateHouseholdRequest
-  ) =>
-    request<Household>(
-      `/auth/users/${encodeURIComponent(
-        userId
-      )}/households/${encodeURIComponent(householdId)}`,
-      {
-        method: "PATCH",
-        body: payload,
-      }
-    ),
-
-  // Splitwise OAuth methods
-  getSplitwiseAuthorizeUrl: (userId: string, callbackUrl: string) => {
-    const params = new URLSearchParams({
-      user_id: userId,
-      callback_url: callbackUrl,
-    });
-    return request<{ authorize_url: string }>(
-      `/auth/splitwise/authorize?${params.toString()}`
-    );
-  },
-
-  checkSplitwiseStatus: (userId: string) =>
-    request<{ user_id: string; authorized: boolean }>(
-      `/auth/splitwise/status/${encodeURIComponent(userId)}`
-    ),
-
-  handleSplitwiseCallback: (
-    userId: string,
-    oauthToken: string,
-    oauthVerifier: string
-  ) =>
-    request<{ success: boolean; message: string }>("/auth/splitwise", {
-      method: "POST",
-      body: {
-        user_id: userId,
-        oauth_token: oauthToken,
-        oauth_verifier: oauthVerifier,
-      },
-    }),
 };
 
 export type { ApiError };
+

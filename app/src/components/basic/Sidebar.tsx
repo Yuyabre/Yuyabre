@@ -28,6 +28,7 @@ import {
 import { User } from "./User";
 import packageJson from "../../../package.json";
 import { cn } from "../../lib/utils";
+import { LogoIcon } from "../icons/Logo";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -252,12 +253,13 @@ export function AppSidebar({
         </div>
         <div
           className={cn(
-            "px-2 py-1.5 transition-all duration-200 overflow-hidden",
+            "px-2 transition-all duration-200 overflow-hidden",
             isCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-20 opacity-100"
           )}
         >
-          <div className="text-xs text-center text-muted-foreground font-medium">
-            Yuyabre v{packageJson.version}
+          <div className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground">
+            <LogoIcon className="size-7 -ml-7" />
+            <span>Yuyabre v{packageJson.version}</span>
           </div>
         </div>
       </SidebarFooter>

@@ -24,6 +24,9 @@ export { expensesApi } from "./expenses";
 // Authentication API
 export { authApi } from "./auth";
 
+// Splitwise API
+export { splitwiseApi } from "./splitwise";
+
 // Legacy Chat API (kept for compatibility)
 import { delay } from "./mocks";
 
