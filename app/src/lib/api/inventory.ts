@@ -1,4 +1,8 @@
-import type { InventoryItem, InventoryItemCreate, InventoryItemUpdate } from "../../types";
+import type {
+  InventoryItem,
+  InventoryItemCreate,
+  InventoryItemUpdate,
+} from "../../types";
 import { getApiBaseUrl } from "../utils";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -91,26 +95,37 @@ const request = async <T>(
  * Inventory API - CRUD operations for inventory items
  */
 export const inventoryApi = {
+  // Note: getAll endpoint no longer exists - use getByUserId instead
+  // Keeping this for backward compatibility but it will throw an error
   getAll: async (): Promise<InventoryItem[]> => {
-    return request<InventoryItem[]>("/inventory");
+    throw new Error(
+      "getAll endpoint no longer exists. Use getByUserId instead."
+    );
   },
 
   getById: async (itemId: string): Promise<InventoryItem> => {
     return request<InventoryItem>(`/inventory/${encodeURIComponent(itemId)}`);
   },
 
-  create: async (item: InventoryItemCreate): Promise<InventoryItem> => {
-    return request<InventoryItem>("/inventory", {
+  create: async (
+    userId: string,
+    item: InventoryItemCreate
+  ): Promise<InventoryItem> => {
+    return request<InventoryItem>(`/inventory/${encodeURIComponent(userId)}`, {
       method: "POST",
       body: item,
     });
   },
 
   update: async (
+    userId: string,
     itemId: string,
     updates: InventoryItemUpdate
   ): Promise<InventoryItem> => {
-    return request<InventoryItem>(`/inventory/${encodeURIComponent(itemId)}`, {
+    const url = `/inventory/${encodeURIComponent(
+      itemId
+    )}?user_id=${encodeURIComponent(userId)}`;
+    return request<InventoryItem>(url, {
       method: "PATCH",
       body: updates,
     });
@@ -125,5 +140,8 @@ export const inventoryApi = {
   getLowStock: async (): Promise<InventoryItem[]> => {
     return request<InventoryItem[]>("/inventory/low-stock");
   },
-};
 
+  getByUserId: async (userId: string): Promise<InventoryItem[]> => {
+    return request<InventoryItem[]>(`/inventory/${encodeURIComponent(userId)}`);
+  },
+};

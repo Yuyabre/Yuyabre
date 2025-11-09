@@ -38,8 +38,7 @@ export function HouseholdOnboardingModal({
   const [city, setCity] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
-  const [whatsappGroupId, setWhatsappGroupId] = useState("");
-  const [whatsappGroupName, setWhatsappGroupName] = useState("");
+  const [discordChannelId, setDiscordChannelId] = useState("");
   const [notes, setNotes] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
@@ -66,8 +65,7 @@ export function HouseholdOnboardingModal({
           city: city.trim() || null,
           postal_code: postalCode.trim() || null,
           country: country.trim() || null,
-          whatsapp_group_id: whatsappGroupId.trim() || null,
-          whatsapp_group_name: whatsappGroupName.trim() || null,
+          discord_channel_id: discordChannelId.trim() || null,
           notes: notes.trim() || null,
         },
       },
@@ -88,8 +86,7 @@ export function HouseholdOnboardingModal({
           setCity("");
           setPostalCode("");
           setCountry("");
-          setWhatsappGroupId("");
-          setWhatsappGroupName("");
+          setDiscordChannelId("");
           setNotes("");
         },
         onError: (error) => {
@@ -288,33 +285,18 @@ export function HouseholdOnboardingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">
-                WhatsApp group ID
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={whatsappGroupId}
-                onChange={(event) => setWhatsappGroupId(event.target.value)}
-                placeholder="Optional"
-                disabled={isBusy}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">
-                WhatsApp group name
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                value={whatsappGroupName}
-                onChange={(event) => setWhatsappGroupName(event.target.value)}
-                placeholder="Optional"
-                disabled={isBusy}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">
+              Discord Channel ID
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              value={discordChannelId}
+              onChange={(event) => setDiscordChannelId(event.target.value)}
+              placeholder="Optional - e.g., 100894387834673284648327"
+              disabled={isBusy}
+            />
           </div>
 
           <div className="space-y-1.5">

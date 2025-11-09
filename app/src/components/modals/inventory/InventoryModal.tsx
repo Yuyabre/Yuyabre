@@ -9,24 +9,31 @@ import {
   IconFilter,
   IconX,
 } from "@tabler/icons-react";
-import { useInventory } from "@/lib/queries";
+import { useUserInventory } from "@/lib/queries";
+import { useStore } from "@/store/useStore";
 import { InventoryItemList } from "./InventoryItemList";
 import { InventoryItemForm } from "./InventoryItemForm";
 
 interface InventoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // userId and userName are kept for backward compatibility but not used
+  // We only manage the current user's inventory
+  userId?: string | null;
+  userName?: string | null;
 }
 
 type StockFilter = "all" | "low" | "normal";
 
-export function InventoryModal({ open, onOpenChange }: InventoryModalProps) {
+export function InventoryModal({ open, onOpenChange, userId, userName }: InventoryModalProps) {
+  const { currentUser } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
 
-  const { data: items = [], isLoading } = useInventory();
+  // Always use current user's ID - we only manage our own inventory
+  const { data: items = [], isLoading } = useUserInventory(currentUser?.user_id ?? null);
 
   const categories = useMemo(() => {
     const cats = new Set(items.map((item) => item.category));
@@ -92,12 +99,15 @@ export function InventoryModal({ open, onOpenChange }: InventoryModalProps) {
     onOpenChange(false);
   };
 
+  const modalTitle = "Inventory";
+  const modalDescription = "Manage your inventory items";
+
   return (
     <Modal
       open={open}
       onOpenChange={handleClose}
-      title="Inventory"
-      description="Manage your household inventory items"
+      title={modalTitle}
+      description={modalDescription}
     >
       <div className="space-y-4">
         {/* Header Actions */}
@@ -112,23 +122,25 @@ export function InventoryModal({ open, onOpenChange }: InventoryModalProps) {
               className="pl-9"
             />
           </div>
-          <Button
-            variant="default"
-            onClick={() => setShowForm(!showForm)}
-            className="shrink-0"
-          >
-            {showForm ? (
-              <>
-                <IconX className="size-4" />
-                Cancel
-              </>
-            ) : (
-              <>
-                <IconPlus className="size-4" />
-                Add Item
-              </>
-            )}
-          </Button>
+          {currentUser && (
+            <Button
+              variant="default"
+              onClick={() => setShowForm(!showForm)}
+              className="shrink-0"
+            >
+              {showForm ? (
+                <>
+                  <IconX className="size-4" />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <IconPlus className="size-4" />
+                  Add Item
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -193,7 +205,7 @@ export function InventoryModal({ open, onOpenChange }: InventoryModalProps) {
         <Separator />
 
         {/* Add Item Form */}
-        {showForm && (
+        {currentUser && showForm && (
           <div className="rounded-lg border border-border bg-muted/40 p-4">
             <h3 className="text-sm font-semibold mb-3">Add New Item</h3>
             <InventoryItemForm

@@ -33,7 +33,7 @@ export function AuthScreen() {
     email: "",
     password: "",
     phone: "",
-    splitwise_user_id: "",
+    discord_user_id: "",
     preferences: { ...defaultPreferences },
   });
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
@@ -94,7 +94,7 @@ export function AuthScreen() {
       password: signupForm.password,
       email: signupForm.email || null,
       phone: signupForm.phone || null,
-      splitwise_user_id: signupForm.splitwise_user_id || null,
+      discord_user_id: signupForm.discord_user_id || null,
       preferences,
     };
 
@@ -255,17 +255,17 @@ export function AuthScreen() {
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
-              Splitwise user ID
+              Discord ID
             </label>
             <input
               type="text"
               className={inputClasses}
-              placeholder="Optional"
-              value={signupForm.splitwise_user_id ?? ""}
+              placeholder="Optional - e.g., 100894387834673284648327"
+              value={signupForm.discord_user_id ?? ""}
               onChange={(event) =>
                 setSignupForm((prev) => ({
                   ...prev,
-                  splitwise_user_id: event.target.value,
+                  discord_user_id: event.target.value,
                 }))
               }
             />
@@ -442,7 +442,7 @@ export function AuthScreen() {
                 {[
                   "AI suggestions keep staples stocked without over-ordering.",
                   "Voice and chat commands to create, update, or check inventory.",
-                  "Invite flatmates instantly with household codes & WhatsApp sync.",
+                  "Invite flatmates instantly with household codes & Discord sync.",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
                     <span className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">

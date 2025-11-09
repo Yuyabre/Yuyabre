@@ -62,7 +62,7 @@ export function HouseholdModal({ open, onOpenChange }: HouseholdModalProps) {
   }
 
   const hasAddress = currentHousehold.address || currentHousehold.city || currentHousehold.postal_code || currentHousehold.country;
-  const hasWhatsApp = currentHousehold.whatsapp_group_id || currentHousehold.whatsapp_group_name;
+  const hasDiscord = currentHousehold.discord_channel_id;
 
   const getInitials = (name: string) =>
     name
@@ -221,20 +221,17 @@ export function HouseholdModal({ open, onOpenChange }: HouseholdModalProps) {
           </>
         )}
 
-        {/* WhatsApp Information */}
-        {hasWhatsApp && (
+        {/* Discord Information */}
+        {hasDiscord && (
           <>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <IconPhone className="size-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold text-foreground">WhatsApp</h3>
+                <h3 className="text-sm font-semibold text-foreground">Discord</h3>
               </div>
               <div className="pl-6 space-y-1 text-sm text-muted-foreground">
-                {currentHousehold.whatsapp_group_name && (
-                  <p className="text-foreground">{currentHousehold.whatsapp_group_name}</p>
-                )}
-                {currentHousehold.whatsapp_group_id && (
-                  <p className="font-mono">{currentHousehold.whatsapp_group_id}</p>
+                {currentHousehold.discord_channel_id && (
+                  <p className="font-mono">{currentHousehold.discord_channel_id}</p>
                 )}
               </div>
             </div>

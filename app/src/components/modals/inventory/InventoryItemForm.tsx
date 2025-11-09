@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IconPlus, IconX } from "@tabler/icons-react";
 import { useCreateInventoryItem } from "@/lib/queries";
+import { useStore } from "@/store/useStore";
 
 interface InventoryItemFormProps {
   onSuccess?: () => void;
@@ -40,6 +41,7 @@ export function InventoryItemForm({
   onSuccess,
   onCancel,
 }: InventoryItemFormProps) {
+  const { currentUser } = useStore();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [customCategory, setCustomCategory] = useState("");
@@ -76,6 +78,11 @@ export function InventoryItemForm({
       return;
     }
 
+    if (!currentUser?.user_id) {
+      toast.error("You must be logged in to create inventory items");
+      return;
+    }
+
     try {
       const itemData: InventoryItemCreate = {
         name: name.trim(),
@@ -88,7 +95,10 @@ export function InventoryItemForm({
         price: price ? parseFloat(price) : null,
       };
 
-      await createMutation.mutateAsync(itemData);
+      await createMutation.mutateAsync({
+        userId: currentUser.user_id,
+        item: itemData,
+      });
       toast.success("Item added successfully");
 
       // Reset form

@@ -17,10 +17,15 @@ import type { InventoryItem, InventoryItemCreate, InventoryItemUpdate, Expense }
 import type { Order, OrderData } from "../types/orders";
 
 // Inventory queries
+// Note: useInventory now uses the current user's ID from the store
+// For viewing other users' inventory, use useUserInventory directly
 export const useInventory = () => {
+  // This will be handled by InventoryModal which gets currentUser from store
+  // For now, return empty array - InventoryModal will use useUserInventory directly
   return useQuery<InventoryItem[]>({
     queryKey: ['inventory'],
-    queryFn: () => inventoryApi.getAll(),
+    queryFn: () => Promise.resolve([]),
+    enabled: false,
   });
 };
 
@@ -31,12 +36,27 @@ export const useLowStockItems = () => {
   });
 };
 
+export const useUserInventory = (userId: string | null) => {
+  return useQuery<InventoryItem[]>({
+    queryKey: ['inventory', 'user', userId],
+    queryFn: () => (userId ? inventoryApi.getByUserId(userId) : []),
+    enabled: !!userId,
+  });
+};
+
 export const useCreateInventoryItem = () => {
   const queryClient = useQueryClient();
-  return useMutation<InventoryItem, Error, InventoryItemCreate>({
-    mutationFn: (item) => inventoryApi.create(item),
-    onSuccess: () => {
+  return useMutation<
+    InventoryItem,
+    Error,
+    { userId: string; item: InventoryItemCreate }
+  >({
+    mutationFn: ({ userId, item }) => inventoryApi.create(userId, item),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({
+        queryKey: ['inventory', 'user', variables.userId],
+      });
       queryClient.invalidateQueries({ queryKey: ['inventory', 'low-stock'] });
     },
   });
@@ -44,10 +64,18 @@ export const useCreateInventoryItem = () => {
 
 export const useUpdateInventoryItem = () => {
   const queryClient = useQueryClient();
-  return useMutation<InventoryItem, Error, { itemId: string; updates: InventoryItemUpdate }>({
-    mutationFn: ({ itemId, updates }) => inventoryApi.update(itemId, updates),
-    onSuccess: () => {
+  return useMutation<
+    InventoryItem,
+    Error,
+    { userId: string; itemId: string; updates: InventoryItemUpdate }
+  >({
+    mutationFn: ({ userId, itemId, updates }) =>
+      inventoryApi.update(userId, itemId, updates),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({
+        queryKey: ['inventory', 'user', variables.userId],
+      });
       queryClient.invalidateQueries({ queryKey: ['inventory', 'low-stock'] });
     },
   });

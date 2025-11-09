@@ -4,6 +4,7 @@ import type { InventoryItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   IconEdit,
   IconTrash,
@@ -13,6 +14,7 @@ import {
 } from "@tabler/icons-react";
 import { useUpdateInventoryItem, useDeleteInventoryItem } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/store/useStore";
 
 interface InventoryItemCardProps {
   item: InventoryItem;
@@ -27,6 +29,7 @@ export function InventoryItemCard({ item }: InventoryItemCardProps) {
 
   const updateMutation = useUpdateInventoryItem();
   const deleteMutation = useDeleteInventoryItem();
+  const currentUser = useStore((state) => state.currentUser);
 
   const isLowStock = item.quantity <= item.threshold;
   const isExpiringSoon =
@@ -36,7 +39,13 @@ export function InventoryItemCard({ item }: InventoryItemCardProps) {
 
   const handleSave = async () => {
     try {
+      if (!currentUser?.user_id) {
+        toast.error("You must be logged in to update items");
+        return;
+      }
+
       await updateMutation.mutateAsync({
+        userId: currentUser.user_id,
         itemId: item.item_id,
         updates: {
           quantity: parseFloat(quantity) || null,
@@ -110,11 +119,12 @@ export function InventoryItemCard({ item }: InventoryItemCardProps) {
             <span className="font-medium">{item.category}</span>
             {item.brand && <span>Brand: {item.brand}</span>}
             {item.price && <span>€{item.price.toFixed(2)}</span>}
-            {item.shared ? (
-              <span className="text-primary">Shared</span>
-            ) : (
-              <span className="text-muted-foreground">Personal</span>
-            )}
+            <Badge
+              variant={item.shared ? "default" : "outline"}
+              className="text-xs"
+            >
+              {item.shared ? "Shared" : "Personal"}
+            </Badge>
           </div>
 
           {isEditing ? (
