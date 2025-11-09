@@ -1,171 +1,32 @@
-# Yuyabre React App
+# Yuyabre Web Client
 
-A React application for shared flat grocery management, built with Vite, Radix UI, Zustand, and TanStack Query.
+This React/Vite single-page app is the face of our autonomous flatmate agent. It lets users chat with the agent, watch live planning traces, and see inventory and expenses update in real time.
 
-## Tech Stack
+## Demo Storyboard
 
-- **React 19** - UI library
-- **Vite** - Build tool and dev server
-- **Radix UI** - Accessible component primitives (Dialog, Select, Toast)
-- **Zustand** - Lightweight state management
-- **TanStack Query** - Server state management and data fetching
-- **pnpm** - Package manager
+- **Chat-first flow**: type `“We’re out of oat milk, can you restock?”` and the UI streams the agent’s reasoning while it calls the backend.
+- **Inventory spotlight**: low-stock badges and expiring items animate so judges instantly see why the agent acts.
+- **Suggested actions**: one-click prompts (e.g., “Clear fridge before Sunday brunch”) highlight scripted scenarios during the 5‑minute pitch.
 
-## Features
+## Tech Notes
 
-### 📱 Progressive Web App
-- Installable experience with offline-first caching
-- Works well on mobile, tablet, and desktop
-- Automatic updates when new versions are deployed
+- React 19 + Vite with Radix UI primitives for a fast, accessible hackathon demo.
+- TanStack Query hydrates inventory/orders via REST while WebSockets stream agent output.
+- Zustand keeps chat state in sync across sidebar, transcript, and suggested actions.
+- Tailored for projector mode: responsive layout, dark theme, large typography.
 
-### 🗂️ Inventory Management
-- View all inventory items with quantities and expiration dates
-- Low stock alerts and warnings
-- Expiration date tracking
-- Category-based organization
-
-### 🛒 Order Placement
-- Select items from inventory to order
-- Streaming order placement (inspired by Vercel AI SDK RSC GenUI)
-- Real-time progress updates during order processing
-- Automatic inventory and expense updates
-
-### 💰 Expense Tracking
-- View all Splitwise expenses
-- Track pending and settled expenses
-- See your share of each expense
-- Link expenses to orders
-
-## Getting Started
-
-### Install Dependencies
+## Run the Frontend
 
 ```bash
 cd app
 pnpm install
+cp .env.example .env   # set VITE_API_BASE_URL to backend origin
+pnpm dev               # http://localhost:5173 for local demo
 ```
 
-### Environment Variables
-
-Create a `.env` file in the `app` directory with the following:
-
-```env
-# API Base URL
-# Can be a full URL (e.g., https://8e6cf2395260.ngrok-free.app) or a relative path (e.g., /api)
-VITE_API_BASE_URL=https://8e6cf2395260.ngrok-free.app
-```
-
-If `VITE_API_BASE_URL` is not set, it defaults to an empty string (relative path), which will use the same origin as the frontend.
-
-### Development
-
-```bash
-pnpm dev
-```
-
-The app will be available at `http://localhost:5173`
-
-### Build
+## Ship the Build
 
 ```bash
 pnpm build
+pnpm preview           # smoke-test the static bundle before deploying
 ```
-
-### Preview Production Build
-
-```bash
-pnpm preview
-```
-
-## Progressive Web App
-
-The application is configured as a Progressive Web App (PWA) using `vite-plugin-pwa`. A service worker precaches the production build output and keeps clients up to date automatically.
-
-- **Run locally:** `pnpm dev` (PWA features are enabled in development mode for testing).
-- **Trigger a new build:** `pnpm build` generates the service worker and updates the precache manifest.
-- **Install:** Open the site in a supported browser (Chrome, Edge, Safari on iOS 16.4+) and use the browser's install prompt or *Add to Home Screen*.
-- **Update assets:** Replace the files in `public/icons/` and adjust the manifest configuration inside `vite.config.ts` if you need different branding.
-
-## Project Structure
-
-```
-app/
-├── src/
-│   ├── components/          # React components
-│   │   ├── InventoryList.jsx    # Inventory display component
-│   │   ├── OrderPlacement.jsx   # Order placement with streaming
-│   │   └── ExpenseTracking.jsx  # Expense tracking component
-│   ├── lib/                 # Utilities and API
-│   │   ├── api.js              # Mock API functions
-│   │   └── queries.js          # TanStack Query hooks
-│   ├── providers/           # Context providers
-│   │   └── QueryProvider.jsx   # TanStack Query provider
-│   ├── store/              # Zustand stores
-│   │   └── useStore.js        # Global state store
-│   ├── App.jsx             # Main app component
-│   ├── main.jsx            # Entry point
-│   └── index.css           # Global styles
-├── package.json
-└── vite.config.js
-```
-
-## Mock API
-
-All API calls are currently mocked using TanStack Query. The mock API includes:
-
-- **Inventory API**: CRUD operations for inventory items
-- **Orders API**: Create and track orders
-- **Expenses API**: Track Splitwise expenses
-
-To replace with real API calls, update the functions in `src/lib/api.js` to make actual HTTP requests.
-
-## Streaming Order Placement
-
-The order placement feature uses a generator function to simulate streaming updates, similar to the Vercel AI SDK's `streamUI` pattern. This provides real-time feedback during the order process:
-
-1. Processing order
-2. Searching for products
-3. Adding items to cart
-4. Placing order with Thuisbezorgd
-5. Updating inventory
-6. Creating Splitwise expense
-
-## Development Notes
-
-- All API calls are mocked with simulated delays
-- TanStack Query DevTools are available in development
-- The UI is responsive and supports light/dark mode
-- Components use Radix UI for accessibility
-
-## Agent Command Streaming API
-
-The app uses WebSocket to stream agent command responses. The WebSocket endpoint is:
-
-```
-ws://localhost:8000/agent/command/stream
-```
-
-The streaming API:
-- Uses WebSocket for bidirectional communication
-- Sends command and user_id as JSON after connection opens
-- Receives messages with `type` field: `chunk`, `done`, or `error`
-- Streams responses in real-time as they're generated
-- Automatically handles connection cleanup
-- Supports both absolute URLs and relative paths via `VITE_API_BASE_URL`
-- Automatically converts HTTP/HTTPS URLs to ws:///wss:// protocols
-
-## Next Steps
-
-To connect to real APIs:
-
-1. Replace mock functions in `src/lib/api.js` with actual HTTP calls
-2. Update environment variables for API endpoints
-3. Add authentication if needed
-4. Implement error handling for network failures
-
-## References
-
-- [Vercel AI SDK RSC GenUI Example](https://github.com/vercel-labs/ai-sdk-preview-rsc-genui) - Inspiration for streaming UI patterns
-- [TanStack Query Docs](https://tanstack.com/query/latest) - Data fetching and caching
-- [Radix UI Docs](https://www.radix-ui.com/) - Component primitives
-- [Zustand Docs](https://github.com/pmndrs/zustand) - State management
