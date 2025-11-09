@@ -10,7 +10,8 @@ from loguru import logger
 
 from database import db
 from config import settings
-from api.routers import agent, inventory, orders, splitwise, system
+from api.routers import agent, inventory, orders, splitwise, system, whatsapp, user
+from api.websocket_manager import websocket_manager
 
 
 # Lifespan event handler for startup/shutdown
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down Grocery Management Agent API")
+    # Close all WebSocket connections
+    await websocket_manager.close_all_connections()
     await db.close()
 
 
@@ -51,10 +54,12 @@ app.add_middleware(
 
 # Include routers
 app.include_router(system.router)
+app.include_router(user.router)
 app.include_router(agent.router)
 app.include_router(inventory.router)
 app.include_router(orders.router)
 app.include_router(splitwise.router)
+app.include_router(whatsapp.router)
 
 
 if __name__ == "__main__":
@@ -71,6 +76,7 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.is_development,
+        # reload=settings.is_development,
+        reload=False
     )
 

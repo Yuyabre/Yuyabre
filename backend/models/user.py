@@ -74,6 +74,7 @@ class User(Document):
         name: User's full name
         email: User's email address
         phone: Phone number (for WhatsApp notifications)
+        household_id: ID of the household this user belongs to
         splitwise_user_id: User ID in Splitwise
         preferences: User dietary preferences
         consumption_patterns: Dictionary of consumption patterns per item
@@ -86,6 +87,8 @@ class User(Document):
     name: str = Field(..., min_length=1, max_length=200)
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
+    password_hash: Optional[str] = None  # Hashed password for authentication
+    household_id: Optional[str] = None
     splitwise_user_id: Optional[str] = None
     preferences: UserPreference = Field(default_factory=UserPreference)
     consumption_patterns: Dict[str, ConsumptionPattern] = Field(default_factory=dict)
@@ -98,6 +101,7 @@ class User(Document):
         indexes = [
             "user_id",
             "email",
+            "household_id",
             "splitwise_user_id",
         ]
     

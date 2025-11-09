@@ -22,6 +22,8 @@ class InventoryItem(Document):
         last_updated: Timestamp of last inventory update
         expiration_date: Optional expiration date for perishable items
         shared: Whether this item is shared among all flatmates
+        user_id: ID of the user who owns this item (for personal items)
+        household_id: ID of the household this item belongs to (for shared items)
         brand: Preferred brand (optional)
         price: Last known price
         notes: Additional notes about the item
@@ -36,6 +38,8 @@ class InventoryItem(Document):
     last_updated: datetime = Field(default_factory=datetime.utcnow)
     expiration_date: Optional[datetime] = None
     shared: bool = Field(default=True)
+    user_id: Optional[str] = Field(default=None, description="Owner user ID for personal items")
+    household_id: Optional[str] = Field(default=None, description="Household ID for shared items")
     brand: Optional[str] = None
     price: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
@@ -46,6 +50,11 @@ class InventoryItem(Document):
             "item_id",
             "name",
             "category",
+            "user_id",
+            "household_id",
+            ("user_id", "name"),  # Compound index for user-specific lookups
+            ("household_id", "name"),  # Compound index for household-specific lookups
+            ("household_id", "shared"),  # Compound index for shared items in household
         ]
     
     def is_low_stock(self) -> bool:
@@ -80,6 +89,8 @@ class InventoryItem(Document):
                 "last_updated": "2025-11-08T10:00:00Z",
                 "expiration_date": "2025-11-15T00:00:00Z",
                 "shared": True,
+                "user_id": None,
+                "household_id": "household123",
                 "brand": "Melkunie",
                 "price": 1.79,
                 "notes": "Semi-skimmed"

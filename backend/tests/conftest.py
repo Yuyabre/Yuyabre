@@ -6,7 +6,13 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
-from models import InventoryItem, Order, User
+from models import (
+    InventoryItem,
+    Order,
+    User,
+    Household,
+    UserInventory,
+)
 
 
 @pytest.fixture(scope="session")
@@ -30,7 +36,13 @@ async def test_db():
     # Initialize Beanie
     await init_beanie(
         database=database,
-        document_models=[InventoryItem, Order, User]
+        document_models=[
+            InventoryItem,
+            Order,
+            User,
+            Household,
+            UserInventory,
+        ]
     )
     
     yield database

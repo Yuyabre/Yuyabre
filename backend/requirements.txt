@@ -98,3 +98,5 @@ wsproto==1.2.0
 xxhash==3.6.0
 yarl==1.22.0
 zstandard==0.25.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1

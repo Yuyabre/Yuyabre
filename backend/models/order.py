@@ -2,7 +2,7 @@
 Order Model - MongoDB schema for tracking grocery orders.
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from enum import Enum
 from beanie import Document
 from pydantic import BaseModel, Field
@@ -75,6 +75,12 @@ class Order(Document):
         splitwise_expense_id: Associated Splitwise expense ID
         notes: Additional notes about the order
         created_by: User who created the order
+        is_group_order: Whether this is a group order requiring housemate responses
+        household_id: ID of the household for group orders
+        pending_responses: Dict mapping item names to list of user IDs who need to respond
+        response_deadline: Deadline for housemates to respond
+        group_responses: Dict mapping user_id to their response data
+        whatsapp_message_sent: Whether WhatsApp notification was sent
     """
     
     order_id: str = Field(default_factory=lambda: str(uuid4()))
@@ -91,6 +97,12 @@ class Order(Document):
     splitwise_expense_id: Optional[str] = None
     notes: Optional[str] = None
     created_by: Optional[str] = None
+    is_group_order: bool = Field(default=False)
+    household_id: Optional[str] = None
+    pending_responses: Dict[str, List[str]] = Field(default_factory=dict)  # item_name -> [user_ids]
+    response_deadline: Optional[datetime] = None
+    group_responses: Dict[str, Dict] = Field(default_factory=dict)  # user_id -> response data
+    whatsapp_message_sent: bool = Field(default=False)
     
     class Settings:
         name = "orders"
@@ -100,6 +112,8 @@ class Order(Document):
             "status",
             "external_order_id",
             "splitwise_expense_id",
+            "household_id",
+            "is_group_order",
         ]
     
     def calculate_total(self) -> float:

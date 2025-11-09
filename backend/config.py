@@ -58,9 +58,11 @@ class Settings(BaseSettings):
     thuisbezorgd_password: Optional[str] = None
     thuisbezorgd_api_url: Optional[str] = None
 
-    # WhatsApp (Future)
-    whatsapp_api_key: Optional[str] = None
-    whatsapp_phone_number: Optional[str] = None
+    # WhatsApp (Twilio)
+    whatsapp_account_sid: Optional[str] = None  # Twilio Account SID
+    whatsapp_auth_token: Optional[str] = None  # Twilio Auth Token
+    whatsapp_from_number: Optional[str] = None  # WhatsApp number from Twilio (format: whatsapp:+1234567890)
+    whatsapp_webhook_url: Optional[str] = None  # Webhook URL for receiving messages
 
     # Application
     app_env: str = "development"

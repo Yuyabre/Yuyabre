@@ -40,6 +40,8 @@ class InventoryService:
         threshold: float = 1.0,
         expiration_date: Optional[datetime] = None,
         shared: bool = True,
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None,
         brand: Optional[str] = None,
         price: Optional[float] = None,
         notes: Optional[str] = None,
@@ -55,6 +57,8 @@ class InventoryService:
             threshold: Low-stock threshold
             expiration_date: Expiration date (for perishable items)
             shared: Whether item is shared among flatmates
+            user_id: User ID for personal items (required if shared=False)
+            household_id: Household ID for shared items (required if shared=True)
             brand: Preferred brand
             price: Price of the item
             notes: Additional notes
@@ -70,6 +74,9 @@ class InventoryService:
                 "quantity": quantity,
                 "unit": unit,
                 "threshold": threshold,
+                "user_id": user_id,
+                "household_id": household_id,
+                "shared": shared,
             },
         )
         item = InventoryItem(
@@ -80,6 +87,8 @@ class InventoryService:
             threshold=threshold,
             expiration_date=expiration_date,
             shared=shared,
+            user_id=user_id,
+            household_id=household_id,
             brand=brand,
             price=price,
             notes=notes,
@@ -105,18 +114,44 @@ class InventoryService:
         return await InventoryItem.find_one(InventoryItem.item_id == item_id)
     
     @cached_query("inventory", get_inventory_cache)
-    async def get_item_by_name(self, name: str) -> Optional[InventoryItem]:
+    async def get_item_by_name(
+        self, 
+        name: str, 
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None
+    ) -> Optional[InventoryItem]:
         """
-        Retrieve an item by its name.
+        Retrieve an item by its name, scoped to user or household.
         
         Args:
             name: Item name
+            user_id: User ID to filter by (for personal items)
+            household_id: Household ID to filter by (for shared items)
             
         Returns:
             InventoryItem if found, None otherwise
         """
-        self._log_db_query("find_one", filters={"name": name})
-        return await InventoryItem.find_one(InventoryItem.name == name)
+        # Build query based on whether it's personal or shared
+        if user_id:
+            # Personal item: must match user_id and not be shared
+            self._log_db_query("find_one", filters={"name": name, "user_id": user_id, "shared": False})
+            return await InventoryItem.find_one(
+                InventoryItem.name == name,
+                InventoryItem.user_id == user_id,
+                InventoryItem.shared == False
+            )
+        elif household_id:
+            # Shared item: must match household_id and be shared
+            self._log_db_query("find_one", filters={"name": name, "household_id": household_id, "shared": True})
+            return await InventoryItem.find_one(
+                InventoryItem.name == name,
+                InventoryItem.household_id == household_id,
+                InventoryItem.shared == True
+            )
+        else:
+            # Fallback: try to find any item with this name (backward compatibility)
+            self._log_db_query("find_one", filters={"name": name})
+            return await InventoryItem.find_one(InventoryItem.name == name)
     
     async def add_or_increment_item(
         self,
@@ -125,6 +160,9 @@ class InventoryService:
         unit: Optional[str] = None,
         category: Optional[str] = None,
         threshold: Optional[float] = None,
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None,
+        shared: Optional[bool] = None,
     ) -> InventoryItem:
         """
         Ensure an item exists in inventory and increase its quantity.
@@ -135,6 +173,9 @@ class InventoryService:
             unit: Unit of measurement (default: "unit")
             category: Category to assign for new items (default: "General")
             threshold: Low-stock threshold for new items (default: 1.0)
+            user_id: User ID for personal items
+            household_id: Household ID for shared items
+            shared: Whether item is shared (defaults to True if household_id provided, False if user_id provided)
 
         Returns:
             Updated or created InventoryItem
@@ -143,8 +184,17 @@ class InventoryService:
         category = category or "General"
         quantity = float(quantity)
         threshold = threshold if threshold is not None else max(quantity * 0.2, 1.0)
+        
+        # Determine shared status if not explicitly provided
+        if shared is None:
+            if household_id:
+                shared = True
+            elif user_id:
+                shared = False
+            else:
+                shared = True  # Default to shared for backward compatibility
 
-        existing = await self.get_item_by_name(name)
+        existing = await self.get_item_by_name(name, user_id=user_id, household_id=household_id)
         if existing:
             logger.info(
                 f"Incrementing inventory for {name}: +{quantity} {unit} (existing {existing.quantity})"
@@ -161,32 +211,99 @@ class InventoryService:
             quantity=quantity,
             unit=unit,
             threshold=threshold,
+            user_id=user_id,
+            household_id=household_id,
+            shared=shared,
         )
 
     @cached_query("inventory", get_inventory_cache)
-    async def get_all_items(self) -> List[InventoryItem]:
+    async def get_all_items(
+        self, 
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None
+    ) -> List[InventoryItem]:
         """
-        Retrieve all inventory items.
+        Retrieve inventory items for a user or household.
         
+        If user_id is provided, returns:
+        - All personal items for that user (shared=False, user_id=user_id)
+        - All shared items for that user's household (shared=True, household_id=household_id)
+        
+        If household_id is provided, returns:
+        - All shared items for that household (shared=True, household_id=household_id)
+        
+        If neither is provided, returns all items (backward compatibility).
+        
+        Args:
+            user_id: User ID to get items for
+            household_id: Household ID to get shared items for
+            
         Returns:
-            List of all InventoryItems
+            List of InventoryItems
         """
-        self._log_db_query("find_all")
-        return await InventoryItem.find_all().to_list()
+        from models.user import User
+        from models.household import Household
+        
+        items = []
+        
+        if user_id:
+            # Get user's household_id if available
+            user = await User.find_one(User.user_id == user_id)
+            user_household_id = getattr(user, 'household_id', None) if user else None
+            
+            # Get personal items
+            personal_items = await InventoryItem.find(
+                InventoryItem.user_id == user_id,
+                InventoryItem.shared == False
+            ).to_list()
+            items.extend(personal_items)
+            
+            # Get shared items from user's household
+            if user_household_id:
+                shared_items = await InventoryItem.find(
+                    InventoryItem.household_id == user_household_id,
+                    InventoryItem.shared == True
+                ).to_list()
+                items.extend(shared_items)
+            
+            self._log_db_query("find", filters={"user_id": user_id, "household_id": user_household_id})
+        elif household_id:
+            # Get shared items for household
+            shared_items = await InventoryItem.find(
+                InventoryItem.household_id == household_id,
+                InventoryItem.shared == True
+            ).to_list()
+            items.extend(shared_items)
+            self._log_db_query("find", filters={"household_id": household_id, "shared": True})
+        else:
+            # Backward compatibility: return all items
+            self._log_db_query("find_all")
+            items = await InventoryItem.find_all().to_list()
+        
+        return items
     
     @cached_query("inventory", get_inventory_cache)
-    async def get_items_by_category(self, category: str) -> List[InventoryItem]:
+    async def get_items_by_category(
+        self, 
+        category: str,
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None
+    ) -> List[InventoryItem]:
         """
-        Retrieve all items in a specific category.
+        Retrieve items in a specific category, scoped to user or household.
         
         Args:
             category: Category name
+            user_id: User ID to filter by
+            household_id: Household ID to filter by
             
         Returns:
             List of InventoryItems in the category
         """
-        self._log_db_query("find", filters={"category": category})
-        return await InventoryItem.find(InventoryItem.category == category).to_list()
+        all_items = await self.get_all_items(user_id=user_id, household_id=household_id)
+        filtered = [item for item in all_items if item.category == category]
+        self._log_db_query("find", filters={"category": category, "user_id": user_id, "household_id": household_id})
+        return filtered
     
     async def update_item(
         self,
@@ -275,14 +392,22 @@ class InventoryService:
         logger.info(f"Deleted inventory item: {item.name}")
         return True
     
-    async def get_low_stock_items(self) -> List[InventoryItem]:
+    async def get_low_stock_items(
+        self,
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None
+    ) -> List[InventoryItem]:
         """
-        Get all items that are below their threshold.
+        Get all items that are below their threshold, scoped to user or household.
         
+        Args:
+            user_id: User ID to filter by
+            household_id: Household ID to filter by
+            
         Returns:
             List of low-stock InventoryItems
         """
-        all_items = await self.get_all_items()
+        all_items = await self.get_all_items(user_id=user_id, household_id=household_id)
         low_stock = [item for item in all_items if item.is_low_stock()]
         logger.info(f"Found {len(low_stock)} low-stock items")
         return low_stock
@@ -321,17 +446,24 @@ class InventoryService:
         logger.info(f"Found {len(expiring_soon)} items expiring in {days} days")
         return expiring_soon
     
-    async def search_items(self, query: str) -> List[InventoryItem]:
+    async def search_items(
+        self, 
+        query: str,
+        user_id: Optional[str] = None,
+        household_id: Optional[str] = None
+    ) -> List[InventoryItem]:
         """
-        Search for items by name (case-insensitive partial match).
+        Search for items by name (case-insensitive partial match), scoped to user or household.
         
         Args:
             query: Search query
+            user_id: User ID to filter by
+            household_id: Household ID to filter by
             
         Returns:
             List of matching InventoryItems
         """
-        all_items = await self.get_all_items()
+        all_items = await self.get_all_items(user_id=user_id, household_id=household_id)
         matches = [
             item for item in all_items
             if query.lower() in item.name.lower()

@@ -6,7 +6,13 @@ from beanie import init_beanie
 from loguru import logger
 
 from config import settings
-from models import InventoryItem, Order, User
+from models import (
+    InventoryItem,
+    Order,
+    User,
+    Household,
+    UserInventory,
+)
 
 
 class Database:
@@ -29,6 +35,8 @@ class Database:
                     InventoryItem,
                     Order,
                     User,
+                    Household,
+                    UserInventory,
                 ]
             )
             
