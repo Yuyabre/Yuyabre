@@ -53,10 +53,14 @@ class Settings(BaseSettings):
     splitwise_consumer_secret: Optional[str] = None
     splitwise_group_id: Optional[str] = None
 
-    # Thuisbezorgd
+    # Thuisbezorgd / Ordering
     thuisbezorgd_email: Optional[str] = None
     thuisbezorgd_password: Optional[str] = None
     thuisbezorgd_api_url: Optional[str] = None
+    ordering_menu_path: Optional[str] = Field(
+        default=None,
+        description="Path to menu data directory (default: backend/data/)"
+    )
 
     # WhatsApp (Twilio)
     whatsapp_account_sid: Optional[str] = None  # Twilio Account SID

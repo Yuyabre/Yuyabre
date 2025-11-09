@@ -1,8 +1,8 @@
 """
 Ordering Service - Integration with Thuisbezorgd for grocery ordering.
 
-NOTE: This is a skeleton implementation. The actual integration will depend on
-whether Thuisbezorgd provides an API or requires web scraping.
+Uses menu loader to search products from pre-scraped restaurant menus.
+This mocks API/scraping functionality until real API is available.
 """
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
@@ -14,6 +14,7 @@ from models.user import User
 from models.household import Household
 from modules.whatsapp import WhatsAppService
 from modules.user_inventory.service import UserInventoryService
+from modules.ordering.menu_loader import MenuLoader
 from config import settings
 from utils.cache import get_order_cache, cached_query
 
@@ -34,7 +35,8 @@ class OrderingService:
         self.cache = get_order_cache()
         self.whatsapp_service = WhatsAppService()
         self.user_inventory_service = UserInventoryService()
-        logger.info("Ordering service initialized with cache")
+        self.menu_loader = MenuLoader()  # Loads menus from JSON (mocks API/scraping)
+        logger.info("Ordering service initialized with cache and menu loader")
     
     async def _invalidate_cache(self) -> None:
         """Invalidate all order cache entries."""
@@ -48,60 +50,201 @@ class OrderingService:
     
     async def search_products(self, query: str) -> List[Dict]:
         """
-        Search for products on Thuisbezorgd.
+        Search for products in restaurant menus (mocks API/scraping).
+        
+        Searches across all available restaurant menus for matching products.
         
         Args:
-            query: Search query (e.g., "milk", "eggs")
+            query: Search query (e.g., "milk", "eggs", "bread")
             
         Returns:
-            List of product dictionaries with id, name, price, etc.
-            
-        TODO: Implement actual search logic based on available API/scraping method
+            List of product dictionaries with product_id, name, price, etc.
+            Format matches what tool handlers expect.
         """
         logger.info(f"Searching for products: {query}")
         
-        # PLACEHOLDER IMPLEMENTATION
-        # This should be replaced with actual API calls or web scraping
-        
-        # Example return structure:
-        return [
-            {
-                "product_id": "prod_123",
-                "name": f"{query.capitalize()} - Sample Product",
-                "description": "Sample product description",
-                "price": 2.99,
-                "unit": "piece",
-                "available": True,
-                "brand": "Sample Brand",
-                "image_url": "https://example.com/image.jpg"
-            }
-        ]
+        try:
+            # Search across all menus (mocks API call to multiple restaurants)
+            matches = await self.menu_loader.search_all_menus(query)
+            
+            if not matches:
+                logger.warning(f"No products found for query: {query}")
+                return []
+            
+            # Format results to match expected structure
+            formatted_results = []
+            for match in matches:
+                formatted_result = {
+                    "product_id": match.get("product_id", ""),
+                    "name": match.get("name", ""),
+                    "price": float(match.get("price", 0.0)),
+                    "unit": "piece",  # Default unit (menu doesn't specify)
+                    "available": match.get("available", True),
+                    "brand": match.get("brand"),
+                    "image_url": match.get("image_url"),
+                    "restaurant_name": match.get("restaurant_name"),
+                    "restaurant_id": match.get("restaurant_id"),
+                }
+                formatted_results.append(formatted_result)
+            
+            logger.info(f"Found {len(formatted_results)} product(s) for '{query}'")
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Error searching products: {e}")
+            # Return empty list on error (graceful degradation)
+            return []
     
     async def get_product_details(self, product_id: str) -> Optional[Dict]:
         """
-        Get detailed information about a specific product.
+        Get detailed information about a specific product from menu (mocks API call).
         
         Args:
-            product_id: Thuisbezorgd product ID
+            product_id: Product ID to look up
             
         Returns:
             Product details dictionary or None if not found
-            
-        TODO: Implement actual product details retrieval
         """
         logger.info(f"Getting product details: {product_id}")
         
-        # PLACEHOLDER IMPLEMENTATION
-        return {
-            "product_id": product_id,
-            "name": "Sample Product",
-            "description": "Sample description",
-            "price": 2.99,
-            "unit": "piece",
-            "available": True,
-            "brand": "Sample Brand",
-        }
+        try:
+            # Search across all menus for this product ID
+            product = await self.menu_loader.get_product_by_id_all_menus(product_id)
+            
+            if not product:
+                logger.warning(f"Product not found: {product_id}")
+                return None
+            
+            # Format to match expected structure
+            return {
+                "product_id": product.get("product_id", product_id),
+                "name": product.get("name", ""),
+                "price": float(product.get("price", 0.0)),
+                "unit": "piece",  # Default unit
+                "available": product.get("available", True),
+                "brand": product.get("brand"),
+                "image_url": product.get("image_url"),
+                "restaurant_name": product.get("restaurant_name"),
+                "restaurant_id": product.get("restaurant_id"),
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting product details: {e}")
+            return None
     
+    async def get_pending_order(self, user_id: Optional[str] = None, within_minutes: int = 5) -> Optional[Order]:
+        """
+        Get the most recent order for a user that can still be modified (pending or recently confirmed).
+        
+        Args:
+            user_id: User ID to check for orders
+            within_minutes: Only consider orders created within this time window (default: 5)
+            
+        Returns:
+            Most recent modifiable order if found, None otherwise
+        """
+        if not user_id:
+            return None
+        
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(minutes=within_minutes)
+            
+            # Find orders for this user created within the time window
+            # Check both PENDING and CONFIRMED (recently confirmed orders can still be modified)
+            # Exclude group orders (they have their own flow)
+            # Exclude orders that are already processing/delivered/cancelled
+            # Use OR condition for status (Beanie doesn't have .in_(), so we check both)
+            pending_orders = await Order.find(
+                Order.created_by == user_id,
+                Order.is_group_order == False,
+                Order.timestamp >= cutoff_time,
+                Order.status == OrderStatus.PENDING
+            ).sort("-timestamp").limit(1).to_list()
+            
+            confirmed_orders = await Order.find(
+                Order.created_by == user_id,
+                Order.is_group_order == False,
+                Order.timestamp >= cutoff_time,
+                Order.status == OrderStatus.CONFIRMED
+            ).sort("-timestamp").limit(1).to_list()
+            
+            # Combine and get the most recent
+            all_orders = pending_orders + confirmed_orders
+            
+            if all_orders:
+                # Sort by timestamp descending and get the most recent
+                all_orders.sort(key=lambda o: o.timestamp, reverse=True)
+                order = all_orders[0]
+                logger.info(f"Found modifiable order {order.order_id} (status: {order.status}) for user {user_id}")
+                return order
+            
+            return None
+        except Exception as e:
+            logger.warning(f"Error checking for pending orders: {e}")
+            return None
+    
+    async def add_items_to_order(
+        self,
+        order_id: str,
+        items: List[Dict[str, any]],
+        created_by: Optional[str] = None,
+    ) -> Optional[Order]:
+        """
+        Add items to an existing pending order.
+        
+        Args:
+            order_id: Order ID to add items to
+            items: List of items to add
+            created_by: User ID adding the items
+            
+        Returns:
+            Updated Order object if successful, None otherwise
+        """
+        logger.info(f"Adding {len(items)} items to order {order_id}")
+        
+        try:
+            order = await Order.find_one(Order.order_id == order_id)
+            if not order:
+                logger.warning(f"Order not found: {order_id}")
+                return None
+            
+            # Allow adding to PENDING or recently CONFIRMED orders
+            if order.status not in [OrderStatus.PENDING, OrderStatus.CONFIRMED]:
+                logger.warning(f"Cannot add items to order {order_id} with status {order.status}")
+                return None
+            
+            # If order is CONFIRMED, change it back to PENDING so it can be modified
+            if order.status == OrderStatus.CONFIRMED:
+                order.status = OrderStatus.PENDING
+                logger.info(f"Changed order {order_id} status from CONFIRMED to PENDING for modification")
+            
+            # Add new items to the order
+            for item_data in items:
+                order_item = OrderItem(
+                    product_id=item_data["product_id"],
+                    name=item_data["name"],
+                    quantity=item_data["quantity"],
+                    unit=item_data.get("unit", "piece"),
+                    price=item_data["price"],
+                    total_price=item_data["price"] * item_data["quantity"],
+                    requested_by=item_data.get("requested_by", [created_by] if created_by else []),
+                )
+                order.add_item(order_item)
+            
+            # Recalculate totals
+            order.calculate_total()
+            
+            # Save updated order
+            await order.save()
+            await self._invalidate_cache()
+            
+            logger.info(f"Added {len(items)} items to order {order_id}. New total: €{order.total:.2f}")
+            return order
+            
+        except Exception as e:
+            logger.error(f"Error adding items to order: {e}")
+            return None
+
     async def create_order(
         self,
         items: List[Dict[str, any]],
@@ -116,6 +259,9 @@ class OrderingService:
         If any items are marked as shared, creates a group order and sends
         WhatsApp notifications to household members.
         
+        If there's a recent pending order for the user, items will be added to it instead
+        of creating a new order (unless it's a group order).
+        
         Args:
             items: List of items to order, each with product_id, quantity, etc.
             delivery_address: Delivery address
@@ -124,9 +270,24 @@ class OrderingService:
             created_by: User ID who created the order
             
         Returns:
-            Created Order object if successful, None otherwise
+            Created or updated Order object if successful, None otherwise
         """
         logger.info(f"Creating order with {len(items)} items")
+        
+        # Check if there's a recent order we can add to (within 5 minutes)
+        if created_by:
+            pending_order = await self.get_pending_order(created_by, within_minutes=5)
+            if pending_order:
+                logger.info(f"Adding items to existing pending order {pending_order.order_id}")
+                # Add items to existing order
+                updated_order = await self.add_items_to_order(
+                    order_id=pending_order.order_id,
+                    items=items,
+                    created_by=created_by
+                )
+                if updated_order:
+                    return updated_order
+                # If adding failed, continue to create new order
         
         try:
             # Get user and household info
@@ -271,8 +432,19 @@ class OrderingService:
                     item_name = item_data.get("name", "")
                     order.pending_responses[item_name] = pending_users.copy()
             
-            # Calculate delivery fee (placeholder - should come from Thuisbezorgd)
-            order.delivery_fee = 2.50
+            # Calculate delivery fee from restaurant menu (mocks API call)
+            # Try to get delivery fee from menu data
+            delivery_fee = 2.50  # Default fallback
+            try:
+                # Load menu to get delivery cost
+                menu_data = await self.menu_loader.load_menu("restaurant1")
+                if menu_data and menu_data.get('restaurant'):
+                    delivery_cost_str = menu_data['restaurant'].get('delivery_cost', '€ 2,50')
+                    delivery_fee = self.menu_loader._parse_price(delivery_cost_str)
+            except Exception as e:
+                logger.warning(f"Could not get delivery fee from menu, using default: {e}")
+            
+            order.delivery_fee = delivery_fee
             order.calculate_total()
             
             # Save order to database
@@ -355,15 +527,16 @@ class OrderingService:
     @cached_query("order", get_order_cache)
     async def get_order_status(self, order_id: str) -> Optional[OrderStatus]:
         """
-        Check the status of an order.
+        Check the status of an order (mocks API status check).
+        
+        Currently returns status from database. In the future, this will
+        query the actual delivery service API for real-time status.
         
         Args:
             order_id: Internal order ID
             
         Returns:
             OrderStatus if found, None otherwise
-            
-        TODO: Implement actual status checking from Thuisbezorgd
         """
         self._log_db_query("find_one", filters={"order_id": order_id})
         order = await Order.find_one(Order.order_id == order_id)
@@ -371,8 +544,9 @@ class OrderingService:
             logger.warning(f"Order not found: {order_id}")
             return None
         
-        # PLACEHOLDER: Check status with Thuisbezorgd
-        # This should query the external service for real-time status
+        # TODO: In the future, query external API for real-time status
+        # For now, return status from database (mocks API response)
+        # Mock status progression could be implemented here if needed
         
         return order.status
     
