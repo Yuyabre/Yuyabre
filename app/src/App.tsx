@@ -195,7 +195,7 @@ function App() {
             {splitwiseCompleted &&
               !currentUser.household_id &&
               !isLoadingHousehold && (
-                <HouseholdOnboardingModal open={hasPromptedHousehold} />
+          <HouseholdOnboardingModal open={hasPromptedHousehold} />
               )}
           </>
         )}

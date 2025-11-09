@@ -72,14 +72,14 @@ export function ChatEmptyState({ onSuggestedAction }: ChatEmptyStateProps) {
         <motion.div
           animate={{
             boxShadow: [
-              "0 0 0 0 rgba(59, 130, 246, 0.25)",
-              "0 0 0 12px rgba(59, 130, 246, 0)",
+              "0 0 0 0 rgba(37, 99, 235, 0.25)",
+              "0 0 0 14px rgba(37, 99, 235, 0)",
             ],
           }}
           transition={{ repeat: Infinity, duration: 2.8, ease: "easeInOut" }}
           className="absolute inset-0 rounded-3xl"
         />
-        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10 text-primary shadow-inner">
+        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/15 via-sky-500/20 to-primary/5 text-primary shadow-[0_10px_45px_-20px_rgba(37,99,235,0.65)]">
           <LogoIcon className="h-12 w-12" />
         </div>
       </motion.div>
@@ -99,7 +99,7 @@ export function ChatEmptyState({ onSuggestedAction }: ChatEmptyStateProps) {
         </p>
       </motion.div>
 
-      <div className="grid w-full max-w-2xl gap-3 rounded-3xl border border-border/60 bg-card/80 p-4 shadow-sm sm:grid-cols-2">
+      <div className="grid w-full max-w-2xl gap-3 rounded-3xl border border-primary/20 bg-gradient-to-b from-background/70 via-sky-500/[0.04] to-background/90 p-4 shadow-[0_18px_40px_-25px_rgba(37,99,235,0.65)] sm:grid-cols-2">
         {highlights.map((highlight, index) => {
           const Icon = highlight.icon;
           const handleClick = () => {
@@ -113,10 +113,10 @@ export function ChatEmptyState({ onSuggestedAction }: ChatEmptyStateProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 + index * 0.1, duration: 0.35 }}
-              className="flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-background/80 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+              className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-background/95 via-sky-500/[0.04] to-background/90 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-gradient-to-br hover:from-primary/10 hover:via-sky-500/10 hover:to-primary/5"
               onClick={handleClick}
             >
-              <span className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-gradient-to-br from-primary/25 via-sky-500/25 to-primary/10 text-primary shadow-[0_12px_30px_-20px_rgba(37,99,235,0.75)] group-hover:shadow-[0_12px_35px_-18px_rgba(37,99,235,0.95)]">
                 <Icon className="size-4" />
               </span>
               <span className="flex flex-col gap-1">
@@ -143,7 +143,7 @@ export function ChatEmptyState({ onSuggestedAction }: ChatEmptyStateProps) {
           onClick={() => onSuggestedAction?.(promptMessage)}
           animate={{ opacity: [0.65, 1, 0.65], y: [0, -3, 0] }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="w-full rounded-2xl border border-border/60 bg-muted/20 p-4 text-left shadow-sm backdrop-blur transition hover:border-primary/40 hover:bg-primary/5"
+          className="w-full rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-sky-500/10 to-primary/5 p-4 text-left shadow-[0_15px_35px_-25px_rgba(37,99,235,0.85)] backdrop-blur transition hover:border-primary/40"
         >
           <p className="text-sm text-muted-foreground">
             Try asking <span className="text-foreground">“{promptMessage}”</span>

@@ -136,14 +136,18 @@ export function AppSidebar({
   }, [installPrompt]);
 
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
+    <Sidebar
+      collapsible="offcanvas"
+      className={cn("border-r border-primary/10", props.className)}
+      {...props}
+    >
+      <SidebarHeader className="border-b border-primary/10 pb-4">
         <div className="flex flex-row items-center gap-2 w-full">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 text-primary hover:bg-primary/10"
             onClick={logout}
           >
             <IconLogout className="size-4" />
@@ -154,7 +158,7 @@ export function AppSidebar({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 text-primary hover:bg-primary/10"
               onClick={handleInstallClick}
               disabled={!installPrompt}
             >
@@ -162,7 +166,7 @@ export function AppSidebar({
               <span className="sr-only">Install app</span>
             </Button>
           )}
-          <SidebarTrigger className="ml-auto" />
+          <SidebarTrigger className="ml-auto text-primary hover:bg-primary/10" />
         </div>
         <User />
       </SidebarHeader>
@@ -181,8 +185,9 @@ export function AppSidebar({
                     setHouseholdOpen(true);
                   }
                 }}
+                className="group hover:text-primary"
               >
-                <IconUsers className="size-4" />
+                <IconUsers className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>
                   {currentHousehold
                     ? currentHousehold.name
@@ -193,7 +198,7 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarSeparator />
+        <SidebarSeparator className="border-primary/10" />
 
         {/* Navigation */}
         <SidebarGroup>
@@ -202,8 +207,9 @@ export function AppSidebar({
               <SidebarMenuButton
                 tooltip="Inventory"
                 onClick={() => setInventoryOpen(true)}
+                className="group hover:text-primary"
               >
-                <IconPackage className="size-4" />
+                <IconPackage className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>Inventory</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -211,8 +217,9 @@ export function AppSidebar({
               <SidebarMenuButton
                 tooltip="Orders"
                 onClick={() => setOrdersOpen(true)}
+                className="group hover:text-primary"
               >
-                <IconShoppingCart className="size-4" />
+                <IconShoppingCart className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>Orders</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -220,8 +227,9 @@ export function AppSidebar({
               <SidebarMenuButton
                 tooltip="Expenses"
                 onClick={() => setExpensesOpen(true)}
+                className="group hover:text-primary"
               >
-                <IconCurrencyEuro className="size-4" />
+                <IconCurrencyEuro className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>Expenses</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -236,8 +244,9 @@ export function AppSidebar({
               <SidebarMenuButton
                 tooltip="Settings"
                 onClick={() => setSettingsOpen(true)}
+                className="group hover:text-primary"
               >
-                <IconSettings className="size-4" />
+                <IconSettings className="size-4 text-primary/80 group-hover:text-primary" />
                 <span>Settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -249,7 +258,7 @@ export function AppSidebar({
             isCollapsed ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
           )}
         >
-          <SidebarSeparator />
+          <SidebarSeparator className="border-primary/10" />
         </div>
         <div
           className={cn(
@@ -258,8 +267,10 @@ export function AppSidebar({
           )}
         >
           <div className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground">
-            <LogoIcon className="size-7 -ml-7" />
-            <span>Yuyabre v{packageJson.version}</span>
+            <LogoIcon className="size-7 -ml-7 text-primary" />
+            <span className="text-primary/80">
+              Yuyabre v{packageJson.version}
+            </span>
           </div>
         </div>
       </SidebarFooter>

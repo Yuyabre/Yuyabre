@@ -211,13 +211,13 @@ export function HouseholdModal({ open, onOpenChange }: HouseholdModalProps) {
               />
             ) : (
               <>
-                <p className="text-sm font-medium text-foreground">
-                  {currentHousehold.name}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-sm font-medium text-foreground">
+              {currentHousehold.name}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
                   {currentHousehold.member_ids.length} member
                   {currentHousehold.member_ids.length !== 1 ? "s" : ""}
-                </p>
+            </p>
               </>
             )}
           </div>
