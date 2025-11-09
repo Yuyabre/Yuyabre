@@ -1,25 +1,62 @@
-export interface User {
-  id: string;
+export interface UserPreferenceRequest {
+  dietary_restrictions?: string[];
+  allergies?: string[];
+  favorite_brands?: string[];
+  disliked_items?: string[];
+}
+
+export interface SignupRequest {
   name: string;
+  password: string;
+  email?: string | null;
+  phone?: string | null;
+  splitwise_user_id?: string | null;
+  preferences?: UserPreferenceRequest | null;
+}
+
+export interface LoginRequest {
   email: string;
-  avatar?: string;
-  isAdmin: boolean;
+  password: string;
 }
 
-export interface Flatmate extends User {
-  joinedAt: string;
-}
-
-export interface Group {
-  id: string;
+export interface User {
+  user_id: string;
   name: string;
-  members: Flatmate[];
-  createdAt: string;
+  email?: string | null;
+  phone?: string | null;
+  household_id?: string | null;
+  is_active: boolean;
+  joined_date: string;
 }
 
-export interface UserSession {
-  user: User;
-  group: Group;
-  token: string;
+export interface Household {
+  household_id: string;
+  name: string;
+  invite_code: string;
+  whatsapp_group_id?: string | null;
+  whatsapp_group_name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  notes?: string | null;
+  member_ids: string[];
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface CreateHouseholdRequest {
+  name: string;
+  whatsapp_group_id?: string | null;
+  whatsapp_group_name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  notes?: string | null;
+}
+
+export interface JoinHouseholdRequest {
+  invite_code: string;
 }
 

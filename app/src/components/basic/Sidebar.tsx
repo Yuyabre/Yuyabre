@@ -21,7 +21,6 @@ import {
   IconUsers,
   IconSettings,
 } from "@tabler/icons-react";
-import { userApi } from "../../lib/api";
 import { User } from "./User";
 import packageJson from "../../../package.json";
 import { cn } from "../../lib/utils";
@@ -40,8 +39,8 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   setOrdersOpen: (open: boolean) => void;
   expensesOpen: boolean;
   setExpensesOpen: (open: boolean) => void;
-  groupOpen: boolean;
-  setGroupOpen: (open: boolean) => void;
+  householdOpen: boolean;
+  setHouseholdOpen: (open: boolean) => void;
 }
 
 export function AppSidebar({
@@ -51,21 +50,13 @@ export function AppSidebar({
   setOrdersOpen,
   expensesOpen,
   setExpensesOpen,
-  groupOpen,
-  setGroupOpen,
+  householdOpen,
+  setHouseholdOpen,
   ...props
 }: AppSidebarProps) {
-  const { currentGroup, setCurrentUser, setCurrentGroup } = useStore();
+  const { currentHousehold } = useStore();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-
-  React.useEffect(() => {
-    // Load user session on mount
-    userApi.getSession().then((session) => {
-      setCurrentUser(session.user);
-      setCurrentGroup(session.group);
-    });
-  }, [setCurrentUser, setCurrentGroup]);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -78,21 +69,23 @@ export function AppSidebar({
 
       <SidebarContent>
         {/* Group Section */}
-        {currentGroup && (
-          <SidebarGroup>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={currentGroup.name}
-                  onClick={() => setGroupOpen(true)}
-                >
-                  <IconUsers className="size-4" />
-                  <span>{currentGroup.name}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        )}
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip={currentHousehold ? currentHousehold.name : "Household setup"}
+                onClick={() => {
+                  if (currentHousehold) {
+                    setHouseholdOpen(true);
+                  }
+                }}
+              >
+                <IconUsers className="size-4" />
+                <span>{currentHousehold ? currentHousehold.name : "Set up household"}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
         <SidebarSeparator />
 

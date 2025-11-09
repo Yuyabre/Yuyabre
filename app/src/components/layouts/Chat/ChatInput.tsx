@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { Label } from "../ui/label";
+import { Label } from "../../ui/label";
 
 interface ChatInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {

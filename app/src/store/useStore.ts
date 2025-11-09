@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { IMessage } from "@/types/chat";
-import type { User, Group } from "@/types/users";
+import type { User, Household } from "@/types/users";
 
 interface Store {
   // Chat state
@@ -14,9 +14,9 @@ interface Store {
 
   // User and group state
   currentUser: User | null;
-  currentGroup: Group | null;
+  currentHousehold: Household | null;
   setCurrentUser: (user: User | null) => void;
-  setCurrentGroup: (group: Group | null) => void;
+  setCurrentHousehold: (household: Household | null) => void;
 }
 
 const useStore = create<Store>((set) => ({
@@ -37,9 +37,9 @@ const useStore = create<Store>((set) => ({
 
   // User and group state
   currentUser: null,
-  currentGroup: null,
+  currentHousehold: null,
   setCurrentUser: (user) => set({ currentUser: user }),
-  setCurrentGroup: (group) => set({ currentGroup: group }),
+  setCurrentHousehold: (household) => set({ currentHousehold: household }),
 }));
 
 export { useStore };

@@ -29,11 +29,12 @@ export const TextStreamMessage = ({ content }: { content: string }) => {
   );
 };
 
-interface MessageProps extends IMessage {
+export interface MessageProps extends IMessage {
   onOrderApproved?: (
     message: string,
     updatedOrder: IMessage["orderData"]
   ) => void;
+  isStreaming?: boolean;
 }
 
 export const Message = ({
@@ -43,8 +44,23 @@ export const Message = ({
   content,
   orderData,
   onOrderApproved,
+  isStreaming = false,
 }: MessageProps) => {
   const [currentOrderData, setCurrentOrderData] = useState(orderData);
+
+  const shouldShowCursor = (text: string): boolean => {
+    if (!isStreaming) {
+      return false;
+    }
+
+    const trimmed = text.trimEnd();
+    if (!trimmed) {
+      return true;
+    }
+
+    const executionRegex = /\[Executing\s+[^\]]+\.\.\.\]\s*$/;
+    return !executionRegex.test(trimmed);
+  };
 
   const handleApprove = async () => {
     if (!currentOrderData) return;
@@ -124,7 +140,18 @@ export const Message = ({
           </div>
         ) : (
           <div className="text-foreground flex flex-col gap-4">
-            <Markdown>{content}</Markdown>
+            {content ? (
+              <div className="flex flex-col gap-2">
+                <Markdown>{content}</Markdown>
+                {shouldShowCursor(content) && (
+                  <span className="ml-0.5 block h-5 w-0.5 animate-pulse rounded bg-primary" />
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground italic">
+                <span className="animate-pulse">Thinking...</span>
+              </div>
+            )}
           </div>
         )}
       </div>
