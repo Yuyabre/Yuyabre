@@ -13,7 +13,7 @@ import type {
   SignupRequest,
   User,
 } from "../types/users";
-import type { InventoryItem, Expense } from "../types";
+import type { InventoryItem, InventoryItemCreate, InventoryItemUpdate, Expense } from "../types";
 import type { Order, OrderData } from "../types/orders";
 
 // Inventory queries
@@ -33,30 +33,33 @@ export const useLowStockItems = () => {
 
 export const useCreateInventoryItem = () => {
   const queryClient = useQueryClient();
-  return useMutation<InventoryItem, Error, Omit<InventoryItem, 'id' | 'lastUpdated'>>({
+  return useMutation<InventoryItem, Error, InventoryItemCreate>({
     mutationFn: (item) => inventoryApi.create(item),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'low-stock'] });
     },
   });
 };
 
 export const useUpdateInventoryItem = () => {
   const queryClient = useQueryClient();
-  return useMutation<InventoryItem, Error, { id: string; updates: Partial<InventoryItem> }>({
-    mutationFn: ({ id, updates }) => inventoryApi.update(id, updates),
+  return useMutation<InventoryItem, Error, { itemId: string; updates: InventoryItemUpdate }>({
+    mutationFn: ({ itemId, updates }) => inventoryApi.update(itemId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'low-stock'] });
     },
   });
 };
 
 export const useDeleteInventoryItem = () => {
   const queryClient = useQueryClient();
-  return useMutation<{ success: boolean }, Error, string>({
-    mutationFn: (id) => inventoryApi.delete(id),
+  return useMutation<void, Error, string>({
+    mutationFn: (itemId) => inventoryApi.delete(itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'low-stock'] });
     },
   });
 };

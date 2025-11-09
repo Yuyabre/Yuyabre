@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLogout } from "@/hooks/useLogout";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
+import { Button } from "../ui/button";
 import { useStore } from "../../store/useStore";
 import {
   IconPackage,
@@ -20,6 +22,7 @@ import {
   IconCurrencyEuro,
   IconUsers,
   IconSettings,
+  IconLogout,
 } from "@tabler/icons-react";
 import { User } from "./User";
 import packageJson from "../../../package.json";
@@ -57,13 +60,25 @@ export function AppSidebar({
   const { currentHousehold } = useStore();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const logout = useLogout();
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <div className="flex flex-row justify-end items-center w-full">
-          <SidebarTrigger />
+        <div className="flex flex-row items-center gap-2 w-full">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={logout}
+          >
+            <IconLogout className="size-4" />
+            <span className="sr-only">Log out</span>
+          </Button>
+          <SidebarTrigger className="ml-auto" />
         </div>
+        <SidebarSeparator />
         <User />
       </SidebarHeader>
 
