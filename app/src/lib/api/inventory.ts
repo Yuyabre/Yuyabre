@@ -1,59 +1,147 @@
-import type { InventoryItem } from "../../types";
-import { delay, mockInventory } from "./mocks";
+import type {
+  InventoryItem,
+  InventoryItemCreate,
+  InventoryItemUpdate,
+} from "../../types";
+import { getApiBaseUrl } from "../utils";
+
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
+  method?: HttpMethod;
+  body?: unknown;
+}
+
+interface ApiError {
+  detail?: Array<{ msg?: string; loc?: (string | number)[] }> | string;
+  message?: string;
+  error?: string;
+}
+
+const defaultHeaders: HeadersInit = {
+  "Content-Type": "application/json",
+};
+
+const buildUrl = (path: string): string => {
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${normalizedPath}`;
+};
+
+const parseErrorMessage = async (response: Response): Promise<string> => {
+  try {
+    const data = (await response.json()) as ApiError;
+    if (typeof data.detail === "string") {
+      return data.detail;
+    }
+    if (Array.isArray(data.detail) && data.detail.length > 0) {
+      return data.detail
+        .map((item) => item.msg)
+        .filter(Boolean)
+        .join(", ");
+    }
+    if (data.message) {
+      return data.message;
+    }
+    if (data.error) {
+      return data.error;
+    }
+  } catch (error) {
+    console.warn("Failed to parse error response", error);
+  }
+
+  return `Request failed with status ${response.status}`;
+};
+
+const request = async <T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> => {
+  const { method = "GET", body, headers, ...rest } = options;
+  const url = buildUrl(path);
+  const init: RequestInit = {
+    method,
+    credentials: "omit",
+    headers: {
+      ...defaultHeaders,
+      ...(headers ?? {}),
+    },
+    ...rest,
+  };
+
+  if (body !== undefined) {
+    init.body = typeof body === "string" ? body : JSON.stringify(body);
+  }
+
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    const message = await parseErrorMessage(response);
+    throw new Error(message);
+  }
+
+  if (response.status === 204 || method === "DELETE") {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+};
 
 /**
  * Inventory API - CRUD operations for inventory items
  */
 export const inventoryApi = {
+  // Note: getAll endpoint no longer exists - use getByUserId instead
+  // Keeping this for backward compatibility but it will throw an error
   getAll: async (): Promise<InventoryItem[]> => {
-    await delay(300);
-    return [...mockInventory];
+    throw new Error(
+      "getAll endpoint no longer exists. Use getByUserId instead."
+    );
   },
 
-  getById: async (id: string): Promise<InventoryItem | undefined> => {
-    await delay(200);
-    return mockInventory.find((item) => item.id === id);
+  getById: async (itemId: string): Promise<InventoryItem> => {
+    return request<InventoryItem>(`/inventory/${encodeURIComponent(itemId)}`);
   },
 
   create: async (
-    item: Omit<InventoryItem, "id" | "lastUpdated">
+    userId: string,
+    item: InventoryItemCreate
   ): Promise<InventoryItem> => {
-    await delay(400);
-    const newItem: InventoryItem = {
-      id: String(Date.now()),
-      ...item,
-      lastUpdated: new Date().toISOString(),
-    };
-    mockInventory.push(newItem);
-    return newItem;
+    return request<InventoryItem>(`/inventory/${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: item,
+    });
   },
 
   update: async (
-    id: string,
-    updates: Partial<InventoryItem>
+    userId: string,
+    itemId: string,
+    updates: InventoryItemUpdate
   ): Promise<InventoryItem> => {
-    await delay(400);
-    const index = mockInventory.findIndex((item) => item.id === id);
-    if (index === -1) throw new Error("Item not found");
-    mockInventory[index] = {
-      ...mockInventory[index],
-      ...updates,
-      lastUpdated: new Date().toISOString(),
-    };
-    return mockInventory[index];
+    const url = `/inventory/${encodeURIComponent(
+      itemId
+    )}?user_id=${encodeURIComponent(userId)}`;
+    return request<InventoryItem>(url, {
+      method: "PATCH",
+      body: updates,
+    });
   },
 
-  delete: async (id: string): Promise<{ success: boolean }> => {
-    await delay(300);
-    const index = mockInventory.findIndex((item) => item.id === id);
-    if (index === -1) throw new Error("Item not found");
-    mockInventory.splice(index, 1);
-    return { success: true };
+  delete: async (itemId: string): Promise<void> => {
+    return request<void>(`/inventory/${encodeURIComponent(itemId)}`, {
+      method: "DELETE",
+    });
   },
 
   getLowStock: async (): Promise<InventoryItem[]> => {
-    await delay(200);
-    return mockInventory.filter((item) => item.quantity <= item.threshold);
+    return request<InventoryItem[]>("/inventory/low-stock");
+  },
+
+  getByUserId: async (userId: string): Promise<InventoryItem[]> => {
+    return request<InventoryItem[]>(`/inventory/${encodeURIComponent(userId)}`);
   },
 };
-

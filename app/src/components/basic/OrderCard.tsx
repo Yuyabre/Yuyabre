@@ -30,7 +30,7 @@ interface OrderCardProps {
 }
 
 export const OrderCard = ({
-  id,
+  id: _id,
   service,
   store,
   items,

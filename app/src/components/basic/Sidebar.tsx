@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLogout } from "@/hooks/useLogout";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "../ui/sidebar";
+import { Button } from "../ui/button";
 import { useStore } from "../../store/useStore";
 import {
   IconPackage,
@@ -20,10 +22,27 @@ import {
   IconCurrencyEuro,
   IconUsers,
   IconSettings,
+  IconLogout,
+  IconDeviceMobileCheck,
 } from "@tabler/icons-react";
 import { User } from "./User";
 import packageJson from "../../../package.json";
 import { cn } from "../../lib/utils";
+
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+  prompt: () => Promise<void>;
+}
+
+declare global {
+  interface WindowEventMap {
+    beforeinstallprompt: BeforeInstallPromptEvent;
+  }
+}
 
 function SidebarSeparator({
   className,
@@ -41,6 +60,8 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   setExpensesOpen: (open: boolean) => void;
   householdOpen: boolean;
   setHouseholdOpen: (open: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export function AppSidebar({
@@ -52,17 +73,95 @@ export function AppSidebar({
   setExpensesOpen,
   householdOpen,
   setHouseholdOpen,
+  settingsOpen,
+  setSettingsOpen,
   ...props
 }: AppSidebarProps) {
   const { currentHousehold } = useStore();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const logout = useLogout();
+  const [installPrompt, setInstallPrompt] =
+    React.useState<BeforeInstallPromptEvent | null>(null);
+  const [canInstall, setCanInstall] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (event: BeforeInstallPromptEvent) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+      setCanInstall(true);
+      console.log("Before install prompt");
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setCanInstall(false);
+      console.log("App installed");
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    if (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone
+    ) {
+      console.log("App is installed (standalone)");
+      setCanInstall(false);
+    }
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = React.useCallback(async () => {
+    if (!installPrompt) {
+      return;
+    }
+
+    try {
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+    } finally {
+      console.log("Install prompt user choice");
+      setInstallPrompt(null);
+      setCanInstall(false);
+    }
+  }, [installPrompt]);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <div className="flex flex-row justify-end items-center w-full">
-          <SidebarTrigger />
+        <div className="flex flex-row items-center gap-2 w-full">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={logout}
+          >
+            <IconLogout className="size-4" />
+            <span className="sr-only">Log out</span>
+          </Button>
+          {canInstall && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleInstallClick}
+              disabled={!installPrompt}
+            >
+              <IconDeviceMobileCheck className="size-4" />
+              <span className="sr-only">Install app</span>
+            </Button>
+          )}
+          <SidebarTrigger className="ml-auto" />
         </div>
         <User />
       </SidebarHeader>
@@ -73,7 +172,9 @@ export function AppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                tooltip={currentHousehold ? currentHousehold.name : "Household setup"}
+                tooltip={
+                  currentHousehold ? currentHousehold.name : "Household setup"
+                }
                 onClick={() => {
                   if (currentHousehold) {
                     setHouseholdOpen(true);
@@ -81,7 +182,11 @@ export function AppSidebar({
                 }}
               >
                 <IconUsers className="size-4" />
-                <span>{currentHousehold ? currentHousehold.name : "Set up household"}</span>
+                <span>
+                  {currentHousehold
+                    ? currentHousehold.name
+                    : "Set up household"}
+                </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -127,7 +232,10 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Settings">
+              <SidebarMenuButton
+                tooltip="Settings"
+                onClick={() => setSettingsOpen(true)}
+              >
                 <IconSettings className="size-4" />
                 <span>Settings</span>
               </SidebarMenuButton>

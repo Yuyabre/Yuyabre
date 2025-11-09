@@ -1,13 +1,36 @@
 export interface InventoryItem {
-  id: string;
+  _id?: string | null;
+  item_id: string;
   name: string;
   category: string;
   quantity: number;
   unit: string;
   threshold: number;
-  expirationDate?: string;
+  last_updated: string;
+  expiration_date?: string | null;
   shared: boolean;
-  lastUpdated?: string;
+  user_id?: string | null;
+  household_id?: string | null;
+  brand?: string | null;
+  price?: number | null;
+  notes?: string | null;
+}
+
+export interface InventoryItemCreate {
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  threshold?: number;
+  shared?: boolean;
+  brand?: string | null;
+  price?: number | null;
+}
+
+export interface InventoryItemUpdate {
+  quantity?: number | null;
+  threshold?: number | null;
+  notes?: string | null;
 }
 
 export interface Expense {

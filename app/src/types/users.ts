@@ -10,7 +10,7 @@ export interface SignupRequest {
   password: string;
   email?: string | null;
   phone?: string | null;
-  splitwise_user_id?: string | null;
+  discord_user_id?: string | null;
   preferences?: UserPreferenceRequest | null;
 }
 
@@ -33,8 +33,9 @@ export interface Household {
   household_id: string;
   name: string;
   invite_code: string;
-  whatsapp_group_id?: string | null;
-  whatsapp_group_name?: string | null;
+  discord_channel_id?: string | null;
+  whatsapp_group_id?: string | null; // Deprecated
+  whatsapp_group_name?: string | null; // Deprecated
   address?: string | null;
   city?: string | null;
   postal_code?: string | null;
@@ -47,8 +48,7 @@ export interface Household {
 
 export interface CreateHouseholdRequest {
   name: string;
-  whatsapp_group_id?: string | null;
-  whatsapp_group_name?: string | null;
+  discord_channel_id?: string | null;
   address?: string | null;
   city?: string | null;
   postal_code?: string | null;
