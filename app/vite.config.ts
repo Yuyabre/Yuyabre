@@ -23,6 +23,7 @@ export default defineConfig({
         "apple-touch-icon.png",
         "icons/icon-192.png",
         "icons/icon-512.png",
+        "logo.svg",
       ],
       manifest: {
         id: "/",
@@ -52,6 +53,12 @@ export default defineConfig({
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",
+          },
+          {
+            src: "/logo.svg",
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "any",
           },
         ],
       },

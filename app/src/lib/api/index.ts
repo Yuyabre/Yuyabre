@@ -16,13 +16,16 @@ export {
 export { inventoryApi } from "./inventory";
 
 // Orders API
-export { ordersApi, placeOrderWithStream } from "./orders";
+export { ordersApi } from "./orders";
 
 // Expenses API
 export { expensesApi } from "./expenses";
 
 // Authentication API
 export { authApi } from "./auth";
+
+// Splitwise API
+export { splitwiseApi } from "./splitwise";
 
 // Legacy Chat API (kept for compatibility)
 import { delay } from "./mocks";

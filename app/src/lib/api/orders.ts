@@ -1,146 +1,120 @@
-import type { Order, OrderData } from "../../types/orders";
-import type { StreamChunk } from "../../types";
-import { delay, mockOrders } from "./mocks";
-import { expensesApi } from "./expenses";
+import { getApiBaseUrl } from "../utils";
+import type { Order } from "../../types/orders";
+
+type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
+  method?: HttpMethod;
+  body?: unknown;
+}
+
+interface ApiError {
+  detail?: Array<{ msg?: string; loc?: (string | number)[] }> | string;
+  message?: string;
+  error?: string;
+}
+
+const defaultHeaders: HeadersInit = {
+  "Content-Type": "application/json",
+};
+
+const buildUrl = (path: string): string => {
+  const baseUrl = getApiBaseUrl();
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath}`;
+};
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const url = buildUrl(path);
+  const { method = "GET", body, headers, ...restOptions } = options;
+
+  const config: RequestInit = {
+    method,
+    headers: {
+      ...defaultHeaders,
+      ...headers,
+    },
+    ...restOptions,
+  };
+
+  if (body !== undefined) {
+    config.body = JSON.stringify(body);
+  }
+
+  try {
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+      let errorMessage = `Request failed with status ${response.status}`;
+      try {
+        const errorData: ApiError = await response.json();
+        if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0) {
+          errorMessage = errorData.detail[0].msg || errorMessage;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If JSON parsing fails, use default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Handle empty responses
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      return data as T;
+    }
+
+    // Return empty object for successful responses without body
+    return {} as T;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("An unknown error occurred");
+  }
+}
 
 /**
  * Orders API - Create and track orders
  */
 export const ordersApi = {
-  getAll: async (): Promise<Order[]> => {
-    await delay(300);
-    return [...mockOrders];
+  /**
+   * Get recent order history
+   */
+  getAll: async (limit: number = 20): Promise<Order[]> => {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    return request<Order[]>(`/orders?${params.toString()}`);
   },
 
-  getById: async (id: string): Promise<Order | undefined> => {
-    await delay(200);
-    return mockOrders.find((order) => order.id === id);
+  /**
+   * Get a specific order by ID
+   */
+  getById: async (orderId: string): Promise<Order> => {
+    return request<Order>(`/orders/${encodeURIComponent(orderId)}`);
   },
 
-  create: async (orderData: OrderData): Promise<Order> => {
-    await delay(1500); // Simulate order processing
-    const newOrder: Order = {
-      id: String(Date.now()),
-      timestamp: new Date().toISOString(),
-      service: "Thuisbezorgd",
-      store: "Albert Heijn", // Default store, can be overridden
-      ...orderData,
-      status: "preparing",
-      deliveryTime: null,
-      splitwiseExpenseId: null,
-    };
-    mockOrders.unshift(newOrder);
-    return newOrder;
+  /**
+   * Get all orders for a specific user
+   */
+  getUserOrders: async (userId: string, limit: number = 50): Promise<Order[]> => {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    return request<Order[]>(
+      `/orders/users/${encodeURIComponent(userId)}?${params.toString()}`
+    );
   },
 
-  updateStatus: async (id: string, status: Order["status"]): Promise<Order> => {
-    await delay(400);
-    const order = mockOrders.find((o) => o.id === id);
-    if (!order) throw new Error("Order not found");
-    order.status = status;
-    if (status === "delivered") {
-      order.deliveryTime = new Date().toISOString();
-    }
-    return order;
-  },
-
-  approve: async (
-    id: string,
-    orderData?: Omit<
-      Order,
-      "id" | "timestamp" | "status" | "deliveryTime" | "splitwiseExpenseId"
-    >
-  ): Promise<{ order: Order; message: string }> => {
-    await delay(800); // Simulate API call delay
-    let order = mockOrders.find((o) => o.id === id);
-
-    // If order doesn't exist in mockOrders but orderData is provided, create it
-    if (!order && orderData) {
-      order = {
-        id,
-        timestamp: new Date().toISOString(),
-        status: "pending",
-        deliveryTime: null,
-        splitwiseExpenseId: null,
-        ...orderData,
-      };
-      mockOrders.unshift(order);
-    }
-
-    if (!order) {
-      throw new Error("Order not found");
-    }
-
-    if (order.status !== "pending") {
-      throw new Error(
-        `Order cannot be approved. Current status: ${order.status}`
-      );
-    }
-
-    // Update order status to preparing
-    order.status = "preparing";
-
-    // Create expense for the order
-    const expense = await expensesApi.create({
-      description: `Grocery Order #${order.id}`,
-      amount: order.total,
-      splitAmount: order.total / 2, // Mock: split between 2 flatmates
-      orderId: order.id,
+  /**
+   * Cancel an order
+   */
+  cancel: async (orderId: string): Promise<void> => {
+    return request<void>(`/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: "POST",
     });
-
-    order.splitwiseExpenseId = expense.id;
-
-    const message = `Your order has been approved and is now being prepared! The order will be delivered in approximately 30-45 minutes. A Splitwise expense has been created for €${order.total.toFixed(
-      2
-    )}.`;
-
-    return { order, message };
   },
 };
-
-/**
- * Simulate streaming order placement (like AI SDK streaming)
- */
-export async function* placeOrderWithStream(
-  orderData: OrderData
-): AsyncGenerator<StreamChunk, void, unknown> {
-  yield { type: "status", message: "Processing order...", progress: 0 };
-  await delay(300);
-
-  yield { type: "status", message: "Searching for products...", progress: 25 };
-  await delay(400);
-
-  yield { type: "status", message: "Adding items to cart...", progress: 50 };
-  await delay(500);
-
-  yield {
-    type: "status",
-    message: "Placing order with Thuisbezorgd...",
-    progress: 75,
-  };
-  await delay(600);
-
-  const order = await ordersApi.create(orderData);
-  yield { type: "order", data: order, progress: 90 };
-
-  yield { type: "status", message: "Updating inventory...", progress: 95 };
-  await delay(300);
-
-  yield {
-    type: "status",
-    message: "Creating Splitwise expense...",
-    progress: 98,
-  };
-  await delay(400);
-
-  const expense = await expensesApi.create({
-    description: `Grocery Order #${order.id}`,
-    amount: order.total,
-    splitAmount: order.total / 2, // Mock: split between 2 flatmates
-    orderId: order.id,
-  });
-
-  order.splitwiseExpenseId = expense.id;
-  yield { type: "complete", order, expense, progress: 100 };
-}
-

@@ -11,6 +11,8 @@ import type {
   JoinHouseholdRequest,
   LoginRequest,
   SignupRequest,
+  UpdateHouseholdRequest,
+  UpdateUserRequest,
   User,
 } from "../types/users";
 import type { InventoryItem, InventoryItemCreate, InventoryItemUpdate, Expense } from "../types";
@@ -166,6 +168,41 @@ export const useGetHousehold = (householdId: string | null) => {
   });
 };
 
+export const useUpdateHousehold = () => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    Household,
+    Error,
+    { userId: string; householdId: string; data: UpdateHouseholdRequest }
+  >({
+    mutationFn: ({ userId, householdId, data }) =>
+      authApi.updateHousehold(userId, householdId, data),
+    onSuccess: (updatedHousehold, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['household', variables.householdId],
+      });
+      queryClient.setQueryData(
+        ['household', variables.householdId],
+        updatedHousehold
+      );
+    },
+  });
+};
+
+export const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    User,
+    Error,
+    { userId: string; data: UpdateUserRequest }
+  >({
+    mutationFn: ({ userId, data }) => authApi.updateUser(userId, data),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user', updatedUser.user_id], updatedUser);
+    },
+  });
+};
+
 export const useHouseholdMembers = (memberIds: string[]) => {
   const uniqueIds = Array.from(new Set(memberIds.filter(Boolean)));
 
@@ -185,5 +222,14 @@ export const useHouseholdMembers = (memberIds: string[]) => {
     .filter((member): member is User => Boolean(member));
 
   return { members, isLoading, isError };
+};
+
+export const useSplitwiseStatus = (userId: string | null) => {
+  return useQuery<{ user_id: string; authorized: boolean } | null>({
+    queryKey: ['splitwise', 'status', userId],
+    queryFn: () => (userId ? authApi.checkSplitwiseStatus(userId) : null),
+    enabled: !!userId,
+    staleTime: 1000 * 30,
+  });
 };
 

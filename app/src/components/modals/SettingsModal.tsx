@@ -19,6 +19,8 @@ import {
   IconSun,
   IconDeviceDesktop,
 } from "@tabler/icons-react";
+import { useUpdateUser } from "@/lib/queries";
+import { toast } from "sonner";
 
 interface SettingsModalProps {
   open: boolean;
@@ -29,14 +31,19 @@ type Theme = "light" | "dark" | "system";
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { theme, setTheme } = useTheme();
-  const { currentUser } = useStore();
+  const { currentUser, setCurrentUser } = useStore();
   const [isCheckingSplitwise, setIsCheckingSplitwise] = useState(false);
   const [isSplitwiseConnected, setIsSplitwiseConnected] = useState(false);
+  const [discordId, setDiscordId] = useState("");
+  const updateUserMutation = useUpdateUser();
+
+  const originalDiscordId = currentUser?.discord_user_id ?? "";
 
   // Check Splitwise status when modal opens
   useEffect(() => {
     if (open && currentUser) {
       checkSplitwiseStatus();
+      setDiscordId(currentUser.discord_user_id ?? "");
     }
   }, [open, currentUser]);
 
@@ -57,6 +64,32 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
+  };
+
+  const handleSaveDiscordId = async () => {
+    if (!currentUser) return;
+
+    const trimmed = discordId.trim();
+    const payload = {
+      discord_user_id: trimmed.length > 0 ? trimmed : null,
+    };
+
+    try {
+      const updatedUser = await updateUserMutation.mutateAsync({
+        userId: currentUser.user_id,
+        data: payload,
+      });
+      setCurrentUser(updatedUser);
+      setDiscordId(updatedUser.discord_user_id ?? "");
+      toast.success("Discord ID updated.");
+    } catch (error) {
+      console.error("Failed to update Discord ID:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update Discord ID. Please try again."
+      );
+    }
   };
 
   const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
@@ -178,9 +211,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
           {/* Account Info */}
           {currentUser && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Account</h3>
+            <div className="space-y-4">
               <div className="space-y-2 text-sm">
+                <h3 className="text-sm font-semibold text-foreground">Account</h3>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Name</span>
                   <span className="font-medium text-foreground">
@@ -203,6 +236,42 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </span>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Discord User ID
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={discordId}
+                    onChange={(event) => setDiscordId(event.target.value)}
+                    placeholder="e.g. 123456789012345678"
+                    className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={updateUserMutation.isPending}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveDiscordId}
+                    disabled={
+                      updateUserMutation.isPending ||
+                      !currentUser ||
+                      discordId.trim() === originalDiscordId
+                    }
+                    className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {updateUserMutation.isPending ? (
+                      <IconLoader2 className="size-4 animate-spin" />
+                    ) : (
+                      <IconCheck className="size-4" />
+                    )}
+                    Save
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used to match your Discord account for notifications and commands.
+                </p>
               </div>
             </div>
           )}

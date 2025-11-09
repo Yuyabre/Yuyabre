@@ -37,7 +37,7 @@ export function ChatSuggestedActions({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px] mb-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full px-4 md:px-0 mx-auto md:max-w-[500px] mb-6">
       {SUGGESTED_ACTIONS.map((suggestion, index) => (
         <ActionButton
           key={index}
@@ -50,4 +50,3 @@ export function ChatSuggestedActions({
     </div>
   );
 }
-

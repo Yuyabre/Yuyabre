@@ -17,7 +17,7 @@ import { Header } from "./components/basic/Header";
 import { AuthScreen } from "./components/layouts/Auth/AuthScreen";
 import { useStore } from "./store/useStore";
 import { authStorage } from "./lib/authStorage";
-import { useGetHousehold, useGetUser } from "./lib/queries";
+import { useGetHousehold, useGetUser, useSplitwiseStatus } from "./lib/queries";
 
 function App() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -39,6 +39,12 @@ function App() {
   // Fetch household when user has household_id
   const { data: fetchedHousehold, isLoading: isLoadingHousehold } =
     useGetHousehold(currentUser?.household_id ?? null);
+  const {
+    data: splitwiseStatus,
+    isLoading: isLoadingSplitwiseStatus,
+    isError: isErrorSplitwiseStatus,
+    refetch: refetchSplitwiseStatus,
+  } = useSplitwiseStatus(currentUser?.user_id ?? null);
 
   useEffect(() => {
     const storedUser = authStorage.loadUser();
@@ -76,34 +82,45 @@ function App() {
       return;
     }
 
-    // Check if we should show Splitwise onboarding
-    // Show Splitwise modal first if user just signed up and hasn't completed it
-    if (
+    if (splitwiseStatus?.authorized) {
+      setSplitwiseCompleted(true);
+      setHasPromptedSplitwise(false);
+    } else if (splitwiseStatus && !splitwiseStatus.authorized) {
+      setSplitwiseCompleted(false);
+    }
+  }, [currentUser, splitwiseStatus]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setHasPromptedHousehold(false);
+      setHasPromptedSplitwise(false);
+      setSplitwiseCompleted(false);
+      return;
+    }
+
+    const canPromptSplitwise =
       !hasPromptedSplitwise &&
       !splitwiseCompleted &&
       !isLoadingUser &&
-      !isLoadingHousehold
-    ) {
-      // Check if user just signed up (no household_id is a good indicator)
-      // We'll show Splitwise modal first
+      !isLoadingHousehold &&
+      !isLoadingSplitwiseStatus &&
+      !splitwiseStatus?.authorized &&
+      !isErrorSplitwiseStatus;
+
+    if (canPromptSplitwise) {
       setHasPromptedSplitwise(true);
     }
 
-    // Only show household onboarding modal if:
-    // 1. User has no household_id
-    // 2. Splitwise onboarding is completed (or skipped)
-    // 3. Not already prompted
-    // 4. Not loading
-    if (
+    const canPromptHousehold =
       !currentUser.household_id &&
       splitwiseCompleted &&
       !hasPromptedHousehold &&
       !isLoadingUser &&
-      !isLoadingHousehold
-    ) {
+      !isLoadingHousehold;
+
+    if (canPromptHousehold) {
       setHasPromptedHousehold(true);
     } else if (currentUser.household_id && hasPromptedHousehold) {
-      // Reset flag when user has household_id
       setHasPromptedHousehold(false);
     }
   }, [
@@ -113,6 +130,9 @@ function App() {
     splitwiseCompleted,
     isLoadingHousehold,
     isLoadingUser,
+    isLoadingSplitwiseStatus,
+    splitwiseStatus,
+    isErrorSplitwiseStatus,
   ]);
 
   if (!isHydrated) {
@@ -164,16 +184,18 @@ function App() {
               onComplete={() => {
                 setSplitwiseCompleted(true);
                 setHasPromptedSplitwise(false);
+                refetchSplitwiseStatus();
               }}
               onSkip={() => {
                 setSplitwiseCompleted(true);
                 setHasPromptedSplitwise(false);
+                refetchSplitwiseStatus();
               }}
             />
             {splitwiseCompleted &&
               !currentUser.household_id &&
               !isLoadingHousehold && (
-                <HouseholdOnboardingModal open={hasPromptedHousehold} />
+          <HouseholdOnboardingModal open={hasPromptedHousehold} />
               )}
           </>
         )}
