@@ -3,6 +3,7 @@ Context Management - Building system prompts with user context.
 """
 from typing import Optional
 from loguru import logger
+from beanie.operators import In
 
 from agent.prompts import SYSTEM_PROMPT
 from models.user import User
@@ -34,6 +35,21 @@ async def build_system_prompt_with_context(user_id: Optional[str] = None) -> str
     # Add email if available
     if user.email:
         context_parts.append(f"Email: {user.email}")
+    
+    # Add household members if available (for selective sharing)
+    if user.household_id:
+        from models.household import Household
+        household = await Household.find_one(Household.household_id == user.household_id)
+        if household and household.member_ids:
+            # Get all household members
+            household_users = await User.find(
+                In(User.user_id, household.member_ids)
+            ).to_list()
+            if household_users:
+                member_info = []
+                for member in household_users:
+                    member_info.append(f"{member.name} (ID: {member.user_id})")
+                context_parts.append(f"Household Members: {', '.join(member_info)}")
     
     # Add preferences if they exist
     prefs = user.preferences

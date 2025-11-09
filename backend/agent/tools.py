@@ -76,6 +76,9 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                 "description": "Create a grocery order with the specified items. "
                 "If any items are marked as 'shared' in the inventory, the system will automatically "
                 "create a group order and send a WhatsApp message to household members asking if they need those items too. "
+                "You can specify which users should share an item using the 'shared_with' field. "
+                "If 'shared_with' is provided, only those users will be notified and included in cost splitting. "
+                "If 'shared_with' is not provided, all household members will be included for shared items. "
                 "The order will be updated based on housemates' responses. "
                 "The tool will return `is_group_order: true` and `whatsapp_sent: true` if this happens.",
                 "parameters": {
@@ -92,6 +95,14 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                                     "unit": {
                                         "type": "string",
                                         "description": "Measurement unit (piece, grams, ml, etc).",
+                                    },
+                                    "shared_with": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Optional: List of user IDs who should share this item. "
+                                        "If provided, only these users will be notified and included in cost splitting. "
+                                        "If not provided and item is shared, all household members will be included. "
+                                        "Use this when the user specifies 'shared with person b' or similar.",
                                     },
                                 },
                                 "required": ["name", "quantity"],

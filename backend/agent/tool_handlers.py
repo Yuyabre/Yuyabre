@@ -240,6 +240,8 @@ class ToolHandlers:
                     "requested_by": [user_id] if user_id else [],
                     # Store original inventory item name for better matching
                     "_inventory_item_name": inventory_item.name if inventory_item else None,
+                    # Store shared_with if specified by LLM
+                    "shared_with": item.get("shared_with"),
                 }
             )
 

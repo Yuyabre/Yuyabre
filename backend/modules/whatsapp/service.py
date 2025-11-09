@@ -141,6 +141,7 @@ class WhatsAppService:
         items: List[Dict[str, Any]],
         created_by_user: str,
         response_deadline: datetime,
+        notify_user_ids: Optional[List[str]] = None,
     ) -> bool:
         """
         Send a group order notification to household members.
@@ -151,6 +152,7 @@ class WhatsAppService:
             items: List of items in the order (with name, quantity, unit)
             created_by_user: User ID who created the order
             response_deadline: Deadline for responses
+            notify_user_ids: Optional list of user IDs to notify. If None, notifies all household members.
             
         Returns:
             True if message was sent successfully, False otherwise
@@ -189,8 +191,21 @@ class WhatsAppService:
         
         message = "\n".join(message_lines)
         
-        # Send to all household members
-        results = await self.send_to_household(household_id, message)
+        # Send to specified users or all household members
+        if notify_user_ids:
+            # Send to specific users only
+            results = {}
+            for user_id in notify_user_ids:
+                user = await User.find_one(User.user_id == user_id)
+                if user and user.phone:
+                    message_sid = await self.send_message(user.phone, message)
+                    results[user_id] = message_sid
+                else:
+                    logger.warning(f"User {user_id} not found or has no phone number")
+                    results[user_id] = None
+        else:
+            # Send to all household members (default behavior)
+            results = await self.send_to_household(household_id, message)
         
         # Check if at least one message was sent
         success = any(sid is not None for sid in results.values())

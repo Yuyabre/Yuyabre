@@ -218,8 +218,54 @@ class OrderingService:
                 order.status = OrderStatus.PENDING
                 logger.info(f"Changed order {order_id} status from CONFIRMED to PENDING for modification")
             
+            # Get household info to determine shared items
+            household = None
+            household_member_ids = []
+            if order.household_id:
+                household = await Household.find_one(Household.household_id == order.household_id)
+                if household:
+                    household_member_ids = getattr(household, 'member_ids', [])
+            
+            # Import inventory service for checking shared items
+            from modules.inventory import InventoryService
+            inventory_service = InventoryService()
+            
             # Add new items to the order
             for item_data in items:
+                item_name = item_data.get("name", "")
+                
+                # Check if this item is shared in inventory
+                is_item_shared = False
+                if order.household_id:
+                    # Try to find in inventory
+                    inventory_item = await inventory_service.get_item_by_name(
+                        name=item_name,
+                        household_id=order.household_id
+                    )
+                    if inventory_item and inventory_item.shared:
+                        is_item_shared = True
+                
+                # Determine who shares this item
+                # Check if shared_with was specified (selective sharing)
+                shared_with = item_data.get("shared_with")
+                shared_by_users = []
+                
+                if is_item_shared:
+                    if shared_with:
+                        # Selective sharing: only specified users + creator
+                        shared_by_users = [created_by] if created_by else []
+                        # Add specified users (validate they're household members)
+                        for user_id in shared_with:
+                            if user_id in household_member_ids and user_id not in shared_by_users:
+                                shared_by_users.append(user_id)
+                        logger.info(f"Item '{item_name}' shared selectively with: {shared_by_users}")
+                    elif household_member_ids:
+                        # Default: all household members share the cost
+                        shared_by_users = household_member_ids.copy()
+                elif not is_item_shared and created_by:
+                    # For personal items, only the requester
+                    shared_by_users = [created_by]
+                
                 order_item = OrderItem(
                     product_id=item_data["product_id"],
                     name=item_data["name"],
@@ -228,6 +274,8 @@ class OrderingService:
                     price=item_data["price"],
                     total_price=item_data["price"] * item_data["quantity"],
                     requested_by=item_data.get("requested_by", [created_by] if created_by else []),
+                    shared=is_item_shared,
+                    shared_by=shared_by_users,
                 )
                 order.add_item(order_item)
             
@@ -402,8 +450,45 @@ class OrderingService:
                 household_id=household_id_value,
             )
             
+            # Get household members for shared items
+            household_member_ids = []
+            if household and hasattr(household, 'member_ids'):
+                household_member_ids = getattr(household, 'member_ids', [])
+            
             # Add items to order
             for item_data in items:
+                item_name = item_data.get("name", "")
+                
+                # Check if this item is shared (from inventory check earlier)
+                is_item_shared = False
+                for shared_item in shared_items:
+                    if shared_item.get("name") == item_name or \
+                       shared_item.get("name", "").split(" - ")[0] == item_name.split(" - ")[0]:
+                        is_item_shared = True
+                        break
+                
+                # Determine who shares this item
+                # Check if shared_with was specified (selective sharing)
+                shared_with = item_data.get("shared_with")
+                shared_by_users = []
+                
+                if is_item_shared:
+                    if shared_with:
+                        # Selective sharing: only specified users + creator
+                        shared_by_users = [created_by] if created_by else []
+                        # Add specified users (validate they're household members)
+                        for user_id in shared_with:
+                            if user_id in household_member_ids and user_id not in shared_by_users:
+                                shared_by_users.append(user_id)
+                        logger.info(f"Item '{item_name}' shared selectively with: {shared_by_users}")
+                    elif household_member_ids:
+                        # Default: all household members share the cost
+                        shared_by_users = household_member_ids.copy()
+                        logger.info(f"Item '{item_name}' shared with all household members: {shared_by_users}")
+                elif not is_item_shared and created_by:
+                    # For personal items, only the requester
+                    shared_by_users = [created_by]
+                
                 order_item = OrderItem(
                     product_id=item_data["product_id"],
                     name=item_data["name"],
@@ -412,6 +497,8 @@ class OrderingService:
                     price=item_data["price"],
                     total_price=item_data["price"] * item_data["quantity"],
                     requested_by=item_data.get("requested_by", [created_by] if created_by else []),
+                    shared=is_item_shared,
+                    shared_by=shared_by_users,
                 )
                 order.add_item(order_item)
             
@@ -420,16 +507,28 @@ class OrderingService:
                 # Set response deadline (e.g., 2 hours from now)
                 order.response_deadline = datetime.utcnow() + timedelta(hours=2)
                 
-                # Get all household members except creator
-                member_ids = getattr(household, 'member_ids', [])
-                pending_users = [
-                    uid for uid in member_ids
-                    if uid != created_by
-                ]
-                
                 # Mark which items need responses
+                # For each shared item, determine who needs to respond based on shared_with
                 for item_data in shared_items:
                     item_name = item_data.get("name", "")
+                    shared_with = item_data.get("shared_with")
+                    
+                    if shared_with:
+                        # Selective sharing: only notify specified users (excluding creator)
+                        pending_users = [
+                            uid for uid in shared_with
+                            if uid != created_by and uid in household_member_ids
+                        ]
+                        logger.info(f"Item '{item_name}' will request responses from: {pending_users}")
+                    else:
+                        # Default: all household members except creator
+                        member_ids = getattr(household, 'member_ids', [])
+                        pending_users = [
+                            uid for uid in member_ids
+                            if uid != created_by
+                        ]
+                        logger.info(f"Item '{item_name}' will request responses from all household members: {pending_users}")
+                    
                     order.pending_responses[item_name] = pending_users.copy()
             
             # Calculate delivery fee from restaurant menu (mocks API call)
@@ -481,6 +580,13 @@ class OrderingService:
                         for item in shared_items
                     ]
                     
+                    # Collect all users who need to be notified (from pending_responses)
+                    # This includes users from shared_with if specified, or all household members
+                    notify_user_ids = set()
+                    for item_name, pending_users in order.pending_responses.items():
+                        notify_user_ids.update(pending_users)
+                    notify_user_ids = list(notify_user_ids) if notify_user_ids else None
+                    
                     # Get household_id safely
                     hh_id = getattr(household, 'household_id', None)
                     if hh_id:
@@ -490,6 +596,7 @@ class OrderingService:
                             items=items_for_message,
                             created_by_user=created_by or "",
                             response_deadline=order.response_deadline or datetime.utcnow(),
+                            notify_user_ids=notify_user_ids,
                         )
                     else:
                         success = False
@@ -689,6 +796,11 @@ class OrderingService:
             # Start with original quantity
             total_quantity = order_item.quantity
             
+            # Track who actually wants this item (for shared_by)
+            users_who_want_item = set()
+            if order.created_by:
+                users_who_want_item.add(order.created_by)  # Creator always wants it
+            
             # Add quantities from responses
             for user_id, response in order.group_responses.items():
                 response_items = response.get("items", [])
@@ -698,10 +810,20 @@ class OrderingService:
                         # Add user to requested_by list
                         if user_id not in order_item.requested_by:
                             order_item.requested_by.append(user_id)
+                        # Track that this user wants the item
+                        users_who_want_item.add(user_id)
             
             # Update order item quantity
             order_item.quantity = total_quantity
             order_item.total_price = order_item.price * total_quantity
+            
+            # Update shared_by: for shared items, include all users who want it
+            # For non-shared items, keep only the creator
+            if order_item.shared:
+                order_item.shared_by = list(users_who_want_item)
+            else:
+                # For personal items, only the creator
+                order_item.shared_by = [order.created_by] if order.created_by else []
         
         # Recalculate totals
         order.calculate_total()

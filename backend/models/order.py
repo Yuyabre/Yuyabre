@@ -32,6 +32,8 @@ class OrderItem(BaseModel):
         price: Price per unit
         total_price: Total price for this item (quantity * price)
         requested_by: List of user IDs who requested this item
+        shared: Whether this item is shared among housemates
+        shared_by: List of user IDs who share this item (for cost splitting)
     """
     
     product_id: str
@@ -41,6 +43,8 @@ class OrderItem(BaseModel):
     price: float = Field(ge=0)
     total_price: float = Field(ge=0)
     requested_by: List[str] = Field(default_factory=list)
+    shared: bool = Field(default=False, description="Whether this item is shared among housemates")
+    shared_by: List[str] = Field(default_factory=list, description="List of user IDs who share this item for cost splitting")
     
     class Config:
         json_schema_extra = {
@@ -51,7 +55,9 @@ class OrderItem(BaseModel):
                 "unit": "liters",
                 "price": 1.75,
                 "total_price": 3.50,
-                "requested_by": ["user1", "user2"]
+                "requested_by": ["user1", "user2"],
+                "shared": True,
+                "shared_by": ["user1", "user2", "user3"]
             }
         }
 
