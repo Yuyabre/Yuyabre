@@ -76,6 +76,7 @@ class GroceryAgent:
             "send_whatsapp_message": self.tool_handlers_obj.send_whatsapp_message,
             "get_housemates": self.tool_handlers_obj.get_housemates,
             "send_discord_message": self.tool_handlers_obj.send_discord_message,
+            "create_splitwise_expense": self.tool_handlers_obj.create_splitwise_expense,
         }
 
         # Initialize conversation manager

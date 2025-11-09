@@ -39,6 +39,8 @@ class Household(Document):
     whatsapp_group_id: Optional[str] = None  # Group ID or phone number
     whatsapp_group_name: Optional[str] = None
     discord_channel_id: Optional[str] = None  # Discord channel ID for household notifications
+    discord_webhook_url: Optional[str] = None  # Optional Discord webhook URL fallback
+    splitwise_group_id: Optional[str] = None  # Splitwise group ID for expense splitting
     member_ids: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = Field(default=True)
@@ -70,6 +72,8 @@ class Household(Document):
                 "name": "Flat 3B",
                 "whatsapp_group_id": "+31612345678",
                 "whatsapp_group_name": "Flat 3B Groceries",
+                "discord_channel_id": "123456789012345678",
+                "discord_webhook_url": "https://discord.com/api/webhooks/...",
                 "member_ids": ["user1", "user2", "user3"],
                 "created_at": "2025-01-01T00:00:00Z",
                 "is_active": True,

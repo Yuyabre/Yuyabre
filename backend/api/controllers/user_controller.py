@@ -14,6 +14,8 @@ from api.serializers import (
     UpdateUserPreferencesRequest,
     UpdatePreferencesResponse,
     UserPreferenceRequest,
+    UpdateHouseholdRequest,
+    UserUpdateRequest,
 )
 from models import UserPreference
 from models.user import User
@@ -165,6 +167,7 @@ class UserController:
                 whatsapp_group_id=household.whatsapp_group_id,
                 whatsapp_group_name=household.whatsapp_group_name,
                 discord_channel_id=household.discord_channel_id,
+                splitwise_group_id=household.splitwise_group_id,
                 member_ids=household.member_ids,
                 created_at=household.created_at.isoformat() if household.created_at else "",
                 is_active=household.is_active,
@@ -207,6 +210,95 @@ class UserController:
             country=household.country,
             whatsapp_group_id=household.whatsapp_group_id,
             whatsapp_group_name=household.whatsapp_group_name,
+            discord_channel_id=household.discord_channel_id,
+            splitwise_group_id=household.splitwise_group_id,
+            member_ids=household.member_ids,
+            created_at=household.created_at.isoformat() if household.created_at else "",
+            is_active=household.is_active,
+            notes=household.notes,
+        )
+    
+    @staticmethod
+    async def update_household(
+        user_id: str,
+        household_id: str,
+        request: UpdateHouseholdRequest,
+    ) -> HouseholdResponse:
+        """
+        Update household information.
+        
+        Args:
+            user_id: The user's unique identifier
+            household_id: The household's unique identifier
+            request: Update household request with fields to update
+            
+        Returns:
+            HouseholdResponse with updated household info
+            
+        Raises:
+            HTTPException: If user or household not found, or user is not a member
+        """
+        from models.household import Household
+        
+        # Verify user exists
+        user = await user_service.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Verify household exists
+        household = await Household.find_one(Household.household_id == household_id)
+        if not household:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Household not found"
+            )
+        
+        # Verify user is a member of the household
+        if user_id not in household.member_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not a member of this household"
+            )
+        
+        # Update fields if provided
+        if request.name is not None:
+            household.name = request.name
+        if request.address is not None:
+            household.address = request.address
+        if request.city is not None:
+            household.city = request.city
+        if request.postal_code is not None:
+            household.postal_code = request.postal_code
+        if request.country is not None:
+            household.country = request.country
+        if request.whatsapp_group_id is not None:
+            household.whatsapp_group_id = request.whatsapp_group_id
+        if request.whatsapp_group_name is not None:
+            household.whatsapp_group_name = request.whatsapp_group_name
+        if request.discord_channel_id is not None:
+            household.discord_channel_id = request.discord_channel_id
+        if request.splitwise_group_id is not None:
+            household.splitwise_group_id = request.splitwise_group_id
+        if request.notes is not None:
+            household.notes = request.notes
+        
+        await household.save()
+        
+        return HouseholdResponse(
+            household_id=household.household_id,
+            name=household.name,
+            invite_code=household.invite_code,
+            address=household.address,
+            city=household.city,
+            postal_code=household.postal_code,
+            country=household.country,
+            whatsapp_group_id=household.whatsapp_group_id,
+            whatsapp_group_name=household.whatsapp_group_name,
+            discord_channel_id=household.discord_channel_id,
+            splitwise_group_id=household.splitwise_group_id,
             member_ids=household.member_ids,
             created_at=household.created_at.isoformat() if household.created_at else "",
             is_active=household.is_active,
@@ -465,4 +557,35 @@ class UserController:
                     disliked_items=user.preferences.disliked_items,
                 ),
             )
+
+    @staticmethod
+    async def update_user(user_id: str, request: UserUpdateRequest) -> UserResponse:
+        updates = request.dict(exclude_unset=True)
+        try:
+            user = await user_service.update_user(user_id, updates)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        return UserController._to_user_response(user)
+
+    @staticmethod
+    def _to_user_response(user: User) -> UserResponse:
+        return UserResponse(
+            user_id=user.user_id,
+            name=user.name,
+            email=user.email,
+            phone=user.phone,
+            discord_user_id=user.discord_user_id,
+            household_id=user.household_id,
+            is_active=user.is_active,
+            joined_date=user.joined_date.isoformat() if user.joined_date else "",
+            preferences=UserPreferenceRequest(
+                dietary_restrictions=user.preferences.dietary_restrictions,
+                allergies=user.preferences.allergies,
+                favorite_brands=user.preferences.favorite_brands,
+                disliked_items=user.preferences.disliked_items,
+            ) if user.preferences else None,
+        )
 

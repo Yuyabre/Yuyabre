@@ -47,4 +47,20 @@ class OrdersController:
                 detail="Cannot cancel order"
             )
         return {"message": "Order cancelled successfully"}
+    
+    @staticmethod
+    async def get_orders_for_user(user_id: str, limit: int = 50) -> List[Order]:
+        """
+        Get all orders for a specific user.
+        
+        This includes orders created by the user and group orders from their household.
+        
+        Args:
+            user_id: The user's unique identifier
+            limit: Maximum number of orders to retrieve (default: 50)
+            
+        Returns:
+            List of Orders relevant to the user
+        """
+        return await ordering_service.get_orders_for_user(user_id, limit)
 

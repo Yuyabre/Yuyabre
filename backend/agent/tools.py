@@ -317,5 +317,38 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_splitwise_expense",
+                "description": "Create a new expense in Splitwise to split costs with household members. "
+                "Use this when the user wants to add an expense to Splitwise, split a cost, or record a shared expense. "
+                "The expense will be automatically split equally among all household members who have Splitwise accounts. "
+                "If the household has a Splitwise group configured, the expense will be added to that group.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "description": {
+                            "type": "string",
+                            "description": "Description of the expense (e.g., 'Grocery shopping', 'Dinner at restaurant').",
+                        },
+                        "amount": {
+                            "type": "number",
+                            "description": "Total amount of the expense in the currency used by the Splitwise group (e.g., 25.50 for €25.50).",
+                        },
+                        "notes": {
+                            "type": "string",
+                            "description": "Optional additional notes or details about the expense.",
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Optional expense category (e.g., 'Groceries', 'Restaurants', 'Transportation'). Defaults to 'Groceries'.",
+                            "default": "Groceries",
+                        },
+                    },
+                    "required": ["description", "amount"],
+                },
+            },
+        },
     ]
 

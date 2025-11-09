@@ -1,8 +1,9 @@
 """
 Request and Response serializers (Pydantic models) for the API.
 """
+from datetime import datetime
+from typing import List, Optional, Dict
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional
 
 
 class CommandRequest(BaseModel):
@@ -79,6 +80,30 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ConsumptionPatternRequest(BaseModel):
+    """Request model for consumption pattern updates."""
+    item_name: Optional[str] = None
+    weekly_average: Optional[float] = None
+    preferred_type: Optional[str] = None
+    preferred_brand: Optional[str] = None
+    last_purchased: Optional[datetime] = None
+
+
+class UserUpdateRequest(BaseModel):
+    """Generic request model for updating user fields."""
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    password: Optional[str] = None
+    household_id: Optional[str] = None
+    splitwise_user_id: Optional[str] = None
+    splitwise_access_token: Optional[str] = None
+    splitwise_access_token_secret: Optional[str] = None
+    discord_user_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+    preferences: Optional[UserPreferenceRequest] = None
+    consumption_patterns: Optional[Dict[str, ConsumptionPatternRequest]] = None
 
 
 class UserResponse(BaseModel):
@@ -132,8 +157,41 @@ class HouseholdResponse(BaseModel):
     whatsapp_group_id: Optional[str] = None
     whatsapp_group_name: Optional[str] = None
     discord_channel_id: Optional[str] = None  # Discord channel ID for household notifications
+    splitwise_group_id: Optional[str] = None  # Splitwise group ID for expense splitting
     member_ids: List[str] = []
     created_at: str
     is_active: bool
     notes: Optional[str] = None
+
+
+class UpdateHouseholdRequest(BaseModel):
+    """Request model for updating household information."""
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    whatsapp_group_id: Optional[str] = None
+    whatsapp_group_name: Optional[str] = None
+    discord_channel_id: Optional[str] = None
+    splitwise_group_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SearchGroupsRequest(BaseModel):
+    """Request model for searching Splitwise groups."""
+    query: str  # Group name to search for
+
+
+class CreateExpenseRequest(BaseModel):
+    """Request model for creating a Splitwise expense."""
+    description: str
+    amount: float
+    splitwise_user_ids: List[str]  # List of Splitwise user IDs to split among
+    group_id: Optional[str] = None  # Splitwise group ID
+    category: str = "Groceries"
+    date: Optional[str] = None  # ISO format date string
+    notes: Optional[str] = None
+    split_method: str = "equal"  # How to split: "equal" or other methods
+    paid_by_user_id: Optional[str] = None  # Splitwise user ID of person who paid
 

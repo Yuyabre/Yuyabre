@@ -15,6 +15,8 @@ from models.household import Household
 from modules.whatsapp import WhatsAppService
 from modules.discord import DiscordService
 from modules.user_inventory.service import UserInventoryService
+from modules.splitwise import SplitwiseService
+from beanie.operators import In
 from config import settings
 from utils.cache import get_order_cache, cached_query
 
@@ -34,8 +36,14 @@ class OrderingService:
         self.password = settings.thuisbezorgd_password
         self.cache = get_order_cache()
         self.whatsapp_service = WhatsAppService()
-        self.discord_service = DiscordService()
+        try:
+            from api.dependencies import discord_service as shared_discord_service
+            self.discord_service = shared_discord_service
+        except ImportError:
+            logger.warning("OrderingService: Shared DiscordService not available, creating local instance")
+            self.discord_service = DiscordService()
         self.user_inventory_service = UserInventoryService()
+        self.splitwise_service = SplitwiseService()
         logger.info("Ordering service initialized with cache")
     
     async def _invalidate_cache(self) -> None:
@@ -47,6 +55,141 @@ class OrderingService:
         Log MongoDB queries executed through the ordering service.
         """
         logger.debug("[MongoDB] orders.{} | {}", operation, details)
+    
+    async def _create_splitwise_expense_for_order(self, order: Order) -> Optional[str]:
+        """
+        Create a Splitwise expense for an order if the household has a Splitwise group configured.
+        
+        Args:
+            order: The order to create an expense for
+            
+        Returns:
+            Splitwise expense ID if successful, None otherwise
+        """
+        # Check if order has a household
+        if not order.household_id:
+            logger.debug(f"Order {order.order_id} has no household_id, skipping Splitwise expense")
+            return None
+        
+        # Get household to check for splitwise_group_id
+        household = await Household.find_one(Household.household_id == order.household_id)
+        if not household:
+            logger.debug(f"Household {order.household_id} not found for order {order.order_id}")
+            return None
+        
+        # Check if household has a Splitwise group configured
+        if not household.splitwise_group_id:
+            logger.debug(f"Household {order.household_id} has no splitwise_group_id, skipping Splitwise expense")
+            return None
+        
+        # Get the user who created the order (they need OAuth tokens)
+        if not order.created_by:
+            logger.warning(f"Order {order.order_id} has no created_by user, cannot create Splitwise expense")
+            return None
+        
+        creator = await User.find_one(User.user_id == order.created_by)
+        if not creator:
+            logger.warning(f"Creator user {order.created_by} not found for order {order.order_id}")
+            return None
+        
+        # Check if creator has Splitwise OAuth tokens
+        if not creator.splitwise_access_token or not creator.splitwise_access_token_secret:
+            logger.debug(f"Creator {order.created_by} has no Splitwise OAuth tokens, skipping Splitwise expense")
+            return None
+        
+        # Get current user's Splitwise user ID from API if not in DB
+        current_user_splitwise_id = creator.splitwise_user_id
+        if not current_user_splitwise_id:
+            logger.info(f"Creator {order.created_by} has OAuth tokens but no splitwise_user_id in DB. Fetching from API...")
+            current_user_splitwise_id = await self.splitwise_service.get_current_user_id(
+                user_id=order.created_by,
+                access_token=creator.splitwise_access_token,
+                access_token_secret=creator.splitwise_access_token_secret,
+            )
+            if current_user_splitwise_id:
+                # Update creator in DB with the fetched Splitwise user ID
+                creator.splitwise_user_id = current_user_splitwise_id
+                await creator.save()
+                logger.info(f"Updated creator {order.created_by} with Splitwise user ID: {current_user_splitwise_id}")
+        
+        # Get group members from Splitwise API
+        logger.info(f"Fetching group members from Splitwise group {household.splitwise_group_id}")
+        group_members = await self.splitwise_service.get_group_members(
+            user_id=order.created_by,
+            access_token=creator.splitwise_access_token,
+            access_token_secret=creator.splitwise_access_token_secret,
+            group_id=household.splitwise_group_id,
+        )
+        
+        if not group_members:
+            logger.warning(f"Could not retrieve members from Splitwise group {household.splitwise_group_id} for order {order.order_id}")
+            return None
+        
+        # Extract Splitwise user IDs from group members
+        splitwise_user_ids = [member["id"] for member in group_members if member.get("id")]
+        
+        # Ensure creator is included
+        if current_user_splitwise_id and current_user_splitwise_id not in splitwise_user_ids:
+            splitwise_user_ids.append(current_user_splitwise_id)
+        
+        if not splitwise_user_ids:
+            logger.debug(f"No members found in Splitwise group {household.splitwise_group_id} for order {order.order_id}")
+            return None
+        
+        # Check if we have at least 2 users (required for splitting)
+        if len(splitwise_user_ids) < 2:
+            logger.warning(
+                f"Splitwise group {household.splitwise_group_id} has only {len(splitwise_user_ids)} member(s). "
+                f"At least 2 members are required to split an expense. Skipping expense creation for order {order.order_id}."
+            )
+            return None
+        
+        # Create expense description
+        items_summary = ", ".join([item.name for item in order.items[:3]])
+        if len(order.items) > 3:
+            items_summary += f" and {len(order.items) - 3} more"
+        description = f"Grocery Order #{order.order_id[:8]}: {items_summary}"
+        
+        # Create notes with order details
+        notes = f"Order ID: {order.order_id}\n"
+        notes += f"Service: {order.service}\n"
+        if order.delivery_address:
+            notes += f"Delivery: {order.delivery_address}\n"
+        if order.notes:
+            notes += f"Notes: {order.notes}"
+        
+        try:
+            # Create expense using creator's OAuth tokens
+            expense_id = await self.splitwise_service.create_user_expense(
+                user_id=order.created_by,
+                access_token=creator.splitwise_access_token,
+                access_token_secret=creator.splitwise_access_token_secret,
+                description=description,
+                amount=order.total,
+                splitwise_user_ids=splitwise_user_ids,
+                group_id=household.splitwise_group_id,
+                category="Groceries",
+                date=order.timestamp,
+                notes=notes,
+                split_method="equal",
+                paid_by_user_id=current_user_splitwise_id if current_user_splitwise_id else None,
+            )
+            
+            if expense_id:
+                logger.info(
+                    f"Created Splitwise expense {expense_id} for order {order.order_id} "
+                    f"(€{order.total:.2f}) in group {household.splitwise_group_id}"
+                )
+                return expense_id
+            else:
+                logger.warning(f"Failed to create Splitwise expense for order {order.order_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating Splitwise expense for order {order.order_id}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
     
     async def search_products(self, query: str) -> List[Dict]:
         """
@@ -294,14 +437,31 @@ class OrderingService:
             
             # Send notification if group order (try Discord first, fallback to WhatsApp)
             if is_group_order and household and hasattr(household, 'household_id'):
-                items_for_message = [
-                    {
-                        "name": item.get("name", ""),
-                        "quantity": item.get("quantity", 0),
-                        "unit": item.get("unit", "piece")
+                # Build items for message with price information from order items
+                items_for_message = []
+                for shared_item in shared_items:
+                    shared_item_name = shared_item.get("name", "")
+                    # Find matching order item to get price
+                    order_item = None
+                    for oi in order.items:
+                        # Match by name (normalize for comparison)
+                        oi_name_normalized = oi.name.lower().replace(" - sample product", "").strip()
+                        shared_name_normalized = shared_item_name.lower().replace(" - sample product", "").strip()
+                        if oi_name_normalized == shared_name_normalized or oi.name == shared_item_name:
+                            order_item = oi
+                            break
+                    
+                    item_data = {
+                        "name": shared_item.get("name", ""),
+                        "quantity": shared_item.get("quantity", 0),
+                        "unit": shared_item.get("unit", "piece")
                     }
-                    for item in shared_items
-                ]
+                    
+                    # Add price if available from order item
+                    if order_item:
+                        item_data["price"] = order_item.price
+                    
+                    items_for_message.append(item_data)
                 
                 # Get household_id safely
                 hh_id = getattr(household, 'household_id', None)
@@ -345,11 +505,17 @@ class OrderingService:
                     logger.warning(f"Failed to send group order notification for order {order.order_id}")
             
             # For group orders, keep status as PENDING until responses are collected
-            # For regular orders, mark as confirmed
+            # For regular orders, mark as confirmed and create Splitwise expense
             if not is_group_order:
                 order.status = OrderStatus.CONFIRMED
                 order.external_order_id = "TB_" + order.order_id[:8]
                 await order.save()
+                
+                # Create Splitwise expense if household has splitwise_group_id
+                expense_id = await self._create_splitwise_expense_for_order(order)
+                if expense_id:
+                    order.splitwise_expense_id = expense_id
+                    await order.save()
             
             await self._invalidate_cache()
             
@@ -552,6 +718,12 @@ class OrderingService:
         await order.save()
         await self._invalidate_cache()
         
+        # Create Splitwise expense if household has splitwise_group_id
+        expense_id = await self._create_splitwise_expense_for_order(order)
+        if expense_id:
+            order.splitwise_expense_id = expense_id
+            await order.save()
+        
         # Update user inventories for shared items
         for order_item in order.items:
             # Get all users who requested this item
@@ -605,6 +777,64 @@ class OrderingService:
         )
         orders = await Order.find_all().sort("-timestamp").limit(limit).to_list()
         return orders
+    
+    @cached_query("order", get_order_cache)
+    async def get_orders_for_user(self, user_id: str, limit: int = 50) -> List[Order]:
+        """
+        Get all orders for a specific user.
+        
+        This includes:
+        - Orders created by the user
+        - Group orders from the user's household (if user is a member)
+        
+        Args:
+            user_id: The user's unique identifier
+            limit: Maximum number of orders to retrieve
+            
+        Returns:
+            List of Orders relevant to the user
+        """
+        from models.user import User
+        
+        # Get user to find their household
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            logger.warning(f"User {user_id} not found when fetching orders")
+            return []
+        
+        # Find orders where user created them
+        created_orders = await Order.find(
+            Order.created_by == user_id
+        ).sort("-timestamp").limit(limit).to_list()
+        
+        # Also find group orders from user's household (if they have one)
+        household_orders = []
+        if user.household_id:
+            household_orders = await Order.find(
+                Order.household_id == user.household_id,
+                Order.is_group_order == True
+            ).sort("-timestamp").limit(limit).to_list()
+        
+        # Combine and deduplicate by order_id
+        all_orders = {order.order_id: order for order in created_orders}
+        for order in household_orders:
+            if order.order_id not in all_orders:
+                all_orders[order.order_id] = order
+        
+        # Sort by timestamp descending and limit
+        sorted_orders = sorted(
+            all_orders.values(),
+            key=lambda o: o.timestamp,
+            reverse=True
+        )[:limit]
+        
+        self._log_db_query(
+            "find_user_orders",
+            filters={"user_id": user_id, "limit": limit, "count": len(sorted_orders)},
+        )
+        
+        logger.info(f"Found {len(sorted_orders)} orders for user {user_id}")
+        return sorted_orders
 
 
 class ThuisbezorgdScraper:

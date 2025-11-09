@@ -1,10 +1,10 @@
 """
 User Service - Business logic for user management and authentication.
 """
-from typing import Optional
+from typing import Optional, Dict
 from loguru import logger
 
-from models import User, Household, UserPreference
+from models import User, Household, UserPreference, ConsumptionPattern
 from utils.auth import get_password_hash, verify_password
 
 
@@ -113,6 +113,66 @@ class UserService:
             User object if found, None otherwise
         """
         return await User.find_one(User.user_id == user_id)
+    
+    async def update_user(self, user_id: str, updates: dict) -> User:
+        """
+        Update arbitrary fields on a user document.
+        """
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        # Email uniqueness check
+        if "email" in updates:
+            new_email = updates.get("email")
+            if new_email and new_email != user.email:
+                existing = await User.find_one(User.email == new_email)
+                if existing and existing.user_id != user_id:
+                    raise ValueError("Email is already in use")
+            user.email = new_email
+
+        # Hash password if provided
+        if updates.get("password"):
+            user.password_hash = get_password_hash(updates["password"])
+
+        simple_fields = [
+            "name",
+            "phone",
+            "household_id",
+            "splitwise_user_id",
+            "splitwise_access_token",
+            "splitwise_access_token_secret",
+            "discord_user_id",
+            "is_active",
+            "notes",
+        ]
+        for field in simple_fields:
+            if field in updates:
+                setattr(user, field, updates[field])
+
+        if "preferences" in updates and updates["preferences"] is not None:
+            prefs_data = updates["preferences"]
+            user.preferences = UserPreference(**prefs_data)
+
+        if "consumption_patterns" in updates:
+            patterns = updates["consumption_patterns"] or {}
+            new_patterns: Dict[str, ConsumptionPattern] = {}
+            for key, value in patterns.items():
+                if value is None:
+                    continue
+                data = {**value}
+                item_name = data.get("item_name") or key
+                new_patterns[item_name] = ConsumptionPattern(
+                    item_name=item_name,
+                    weekly_average=data.get("weekly_average", 0.0),
+                    preferred_type=data.get("preferred_type"),
+                    preferred_brand=data.get("preferred_brand"),
+                    last_purchased=data.get("last_purchased"),
+                )
+            user.consumption_patterns = new_patterns
+
+        await user.save()
+        return user
     
     async def join_household(self, user_id: str, invite_code: str) -> Household:
         """

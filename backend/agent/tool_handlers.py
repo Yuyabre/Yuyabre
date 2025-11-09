@@ -2,6 +2,7 @@
 Tool Handlers - Implementation of all agent tools.
 """
 from typing import Any, Dict, List, Optional, Callable, Awaitable
+from datetime import datetime
 from loguru import logger
 
 from modules.inventory import InventoryService
@@ -928,13 +929,20 @@ class ToolHandlers:
         logger.info(f"Sending Discord message to household {household.household_id}, channel {household.discord_channel_id}")
         logger.debug(f"Message: {message}")
         
-        message_id = await self.discord_service.send_message_to_channel(
-            int(household.discord_channel_id),
-            message
+        results = await self.discord_service.send_to_household(
+            household_id=household.household_id,
+            message=message,
+            initiated_by_user_id=user.user_id,
+            metadata={
+                "source": "manual_discord_message",
+                "initiated_at": datetime.utcnow().isoformat(),
+            },
         )
         
+        message_id = next((mid for mid in results.values() if mid is not None), None)
+        
         if message_id:
-            logger.info(f"Discord message sent successfully. Message ID: {message_id}")
+            logger.info(f"Discord message sent successfully. Message reference: {message_id}")
             return {
                 "success": True,
                 "message": f"Discord message sent to household channel",
@@ -946,5 +954,172 @@ class ToolHandlers:
             return {
                 "success": False,
                 "error": "Failed to send Discord message. Check server logs for details. Possible causes: bot not ready, invalid channel ID, or missing permissions.",
+            }
+    
+    async def create_splitwise_expense(
+        self,
+        description: str,
+        amount: float,
+        notes: Optional[str] = None,
+        category: str = "Groceries",
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a new expense in Splitwise to split costs with household members.
+        
+        Args:
+            description: Description of the expense
+            amount: Total amount of the expense
+            notes: Optional additional notes
+            category: Expense category (default: "Groceries")
+            user_id: ID of the user creating the expense
+            
+        Returns:
+            Dict with success status and expense details
+        """
+        if not user_id:
+            return {
+                "success": False,
+                "error": "User ID is required to create Splitwise expense",
+            }
+        
+        # Get user to check authorization and get household
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": f"User {user_id} not found",
+            }
+        
+        # Check if user has Splitwise OAuth tokens
+        if not user.splitwise_access_token or not user.splitwise_access_token_secret:
+            return {
+                "success": False,
+                "error": "User is not authorized with Splitwise. Please connect your Splitwise account first.",
+            }
+        
+        # Check if user has a household
+        if not user.household_id:
+            return {
+                "success": False,
+                "error": "User is not part of a household. Cannot create shared expense.",
+            }
+        
+        # Get household to check for splitwise_group_id
+        household = await Household.find_one(Household.household_id == user.household_id)
+        if not household:
+            return {
+                "success": False,
+                "error": f"Household {user.household_id} not found",
+            }
+        
+        # Check if household has a Splitwise group configured
+        if not household.splitwise_group_id:
+            return {
+                "success": False,
+                "error": "Household does not have a Splitwise group configured. Please configure splitwise_group_id in household settings.",
+            }
+        
+        # Get current user's Splitwise user ID from API if not in DB
+        current_user_splitwise_id = user.splitwise_user_id
+        if not current_user_splitwise_id:
+            logger.info(f"User {user_id} has OAuth tokens but no splitwise_user_id in DB. Fetching from API...")
+            current_user_splitwise_id = await self.splitwise_service.get_current_user_id(
+                user_id=user_id,
+                access_token=user.splitwise_access_token,
+                access_token_secret=user.splitwise_access_token_secret,
+            )
+            if current_user_splitwise_id:
+                # Update user in DB with the fetched Splitwise user ID
+                user.splitwise_user_id = current_user_splitwise_id
+                await user.save()
+                logger.info(f"Updated user {user_id} with Splitwise user ID: {current_user_splitwise_id}")
+        
+        # Get group members from Splitwise API
+        logger.info(f"Fetching group members from Splitwise group {household.splitwise_group_id}")
+        group_members = await self.splitwise_service.get_group_members(
+            user_id=user_id,
+            access_token=user.splitwise_access_token,
+            access_token_secret=user.splitwise_access_token_secret,
+            group_id=household.splitwise_group_id,
+        )
+        
+        if not group_members:
+            return {
+                "success": False,
+                "error": f"Could not retrieve members from Splitwise group {household.splitwise_group_id}. The group may not exist or you may not have access.",
+            }
+        
+        # Extract Splitwise user IDs from group members
+        splitwise_user_ids = [member["id"] for member in group_members if member.get("id")]
+        
+        # Ensure current user is included
+        if current_user_splitwise_id and current_user_splitwise_id not in splitwise_user_ids:
+            splitwise_user_ids.append(current_user_splitwise_id)
+        
+        if not splitwise_user_ids:
+            return {
+                "success": False,
+                "error": "No members found in Splitwise group.",
+            }
+        
+        # Check if we have at least 2 users (required for splitting)
+        if len(splitwise_user_ids) < 2:
+            return {
+                "success": False,
+                "error": f"Splitwise group has only {len(splitwise_user_ids)} member(s). At least 2 members are required to split an expense. Please add more members to your Splitwise group.",
+            }
+        
+        if amount <= 0:
+            return {
+                "success": False,
+                "error": "Expense amount must be greater than zero",
+            }
+        
+        try:
+            # Create expense using user's OAuth tokens
+            expense_id = await self.splitwise_service.create_user_expense(
+                user_id=user_id,
+                access_token=user.splitwise_access_token,
+                access_token_secret=user.splitwise_access_token_secret,
+                description=description,
+                amount=amount,
+                splitwise_user_ids=splitwise_user_ids,
+                group_id=household.splitwise_group_id,
+                category=category,
+                date=None,  # Use current date
+                notes=notes,
+                split_method="equal",
+                paid_by_user_id=current_user_splitwise_id if current_user_splitwise_id else None,
+            )
+            
+            if expense_id:
+                logger.info(
+                    f"Created Splitwise expense {expense_id} for user {user_id}: "
+                    f"{description} (€{amount:.2f}) in group {household.splitwise_group_id}"
+                )
+                return {
+                    "success": True,
+                    "expense_id": expense_id,
+                    "description": description,
+                    "amount": amount,
+                    "split_among": len(splitwise_user_ids),
+                    "group_id": household.splitwise_group_id,
+                    "message": f"Expense '{description}' (€{amount:.2f}) created successfully and split equally among {len(splitwise_user_ids)} household member(s).",
+                }
+            else:
+                logger.warning(f"Failed to create Splitwise expense for user {user_id}")
+                return {
+                    "success": False,
+                    "error": "Failed to create expense in Splitwise. Check server logs for details.",
+                }
+                
+        except Exception as e:
+            logger.error(f"Error creating Splitwise expense for user {user_id}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return {
+                "success": False,
+                "error": f"Error creating Splitwise expense: {str(e)}",
             }
 

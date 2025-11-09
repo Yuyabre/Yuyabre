@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     # Discord
     discord_bot_token: Optional[str] = None  # Discord bot token from Discord Developer Portal
     discord_permission_id: Optional[str] = None  # Discord permission ID for the bot
+    discord_webhook_url: Optional[str] = None  # Discord webhook URL for sending messages
 
     # Application
     app_env: str = "development"

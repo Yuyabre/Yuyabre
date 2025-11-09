@@ -242,22 +242,32 @@ class SplitwiseOAuthService:
             user.splitwise_access_token_secret = access_token_secret
             logger.debug(f"Updated user {user_id} with access tokens")
             
-            # Get user's Splitwise user ID using authenticated client
+            # Get user's Splitwise user ID using OAuth-authenticated request
             try:
                 logger.debug("Fetching Splitwise user info to get user ID")
-                client = Splitwise(
+                # Use OAuth1Session to make authenticated API call
+                oauth = OAuth1Session(
                     self.consumer_key,
-                    self.consumer_secret,
-                    api_key=access_token,
-                    api_secret=access_token_secret
+                    client_secret=self.consumer_secret,
+                    resource_owner_key=access_token,
+                    resource_owner_secret=access_token_secret
                 )
-                current_user = client.getCurrentUser()
-                splitwise_user_id = str(current_user.getId())
-                user.splitwise_user_id = splitwise_user_id
-                logger.debug(f"Retrieved Splitwise user ID: {splitwise_user_id}")
+                
+                # Make API call to get current user
+                response = oauth.get("https://secure.splitwise.com/api/v3.0/get_current_user")
+                response.raise_for_status()
+                user_data = response.json()
+                
+                if "user" in user_data and "id" in user_data["user"]:
+                    splitwise_user_id = str(user_data["user"]["id"])
+                    user.splitwise_user_id = splitwise_user_id
+                    logger.debug(f"Retrieved Splitwise user ID: {splitwise_user_id}")
+                else:
+                    logger.warning("Splitwise API response missing user ID")
             except Exception as e:
                 logger.warning(f"Could not get Splitwise user ID: {type(e).__name__}: {e}")
-                logger.debug("Continuing without Splitwise user ID")
+                logger.debug(f"Error details: {str(e)}")
+                logger.debug("Continuing without Splitwise user ID - user is still authorized")
             
             await user.save()
             logger.info(f"Successfully authorized Splitwise for user {user_id} (name: {user.name})")

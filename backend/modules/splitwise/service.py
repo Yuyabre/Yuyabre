@@ -264,15 +264,18 @@ class SplitwiseService:
             return None
         
         try:
+            # For OAuth 1.0, the Splitwise library uses api_key for the access token
+            # The access_token_secret is stored but not passed to Splitwise constructor
+            # OAuth 1.0 signing is handled internally by the library
             client = Splitwise(
                 settings.splitwise_consumer_key,
                 settings.splitwise_consumer_secret,
-                api_key=access_token,
-                api_secret=access_token_secret
+                api_key=access_token
             )
             return client
         except Exception as e:
             logger.error(f"Failed to create user Splitwise client: {e}")
+            logger.debug(f"Error details: {str(e)}")
             return None
     
     async def get_user_expenses(
@@ -334,5 +337,333 @@ class SplitwiseService:
             
         except Exception as e:
             logger.error(f"Failed to get user expenses for {user_id}: {e}")
+            return []
+    
+    async def search_groups(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+        query: str
+    ) -> List[Dict]:
+        """
+        Search for Splitwise groups by name.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            query: Search query (group name)
+            
+        Returns:
+            List of matching group dictionaries
+        """
+        from requests_oauthlib import OAuth1Session
+        from config import settings
+        
+        try:
+            # Create OAuth session
+            oauth = OAuth1Session(
+                settings.splitwise_consumer_key,
+                client_secret=settings.splitwise_consumer_secret,
+                resource_owner_key=access_token,
+                resource_owner_secret=access_token_secret
+            )
+            
+            # Get all groups
+            response = oauth.get("https://secure.splitwise.com/api/v3.0/get_groups")
+            response.raise_for_status()
+            data = response.json()
+            
+            groups = data.get("groups", [])
+            
+            # Filter groups by name (case-insensitive partial match)
+            query_lower = query.lower()
+            matching_groups = [
+                {
+                    "id": str(group.get("id", "")),
+                    "name": group.get("name", ""),
+                    "created_at": group.get("created_at"),
+                    "updated_at": group.get("updated_at"),
+                    "members": [
+                        {
+                            "id": str(member.get("id", "")),
+                            "first_name": member.get("first_name", ""),
+                            "last_name": member.get("last_name", ""),
+                            "email": member.get("email", ""),
+                        }
+                        for member in group.get("members", [])
+                    ],
+                }
+                for group in groups
+                if query_lower in group.get("name", "").lower()
+            ]
+            
+            logger.info(f"Found {len(matching_groups)} matching groups for query '{query}'")
+            return matching_groups
+            
+        except Exception as e:
+            logger.error(f"Failed to search groups for user {user_id}: {e}")
+            return []
+    
+    async def create_user_expense(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+        description: str,
+        amount: float,
+        splitwise_user_ids: List[str],
+        group_id: Optional[str] = None,
+        category: str = "Groceries",
+        date: Optional[datetime] = None,
+        notes: Optional[str] = None,
+        split_method: str = "equal",
+        paid_by_user_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Create a new expense in Splitwise using user's OAuth tokens.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            description: Description of the expense
+            amount: Total amount to split
+            splitwise_user_ids: List of Splitwise user IDs to split among
+            group_id: Splitwise group ID (optional)
+            category: Expense category (default: "Groceries")
+            date: Date of the expense (default: now)
+            notes: Additional notes
+            split_method: How to split the expense ("equal" by default)
+            paid_by_user_id: Splitwise user ID of the person who paid (defaults to first user)
+            
+        Returns:
+            Expense ID if successful, None otherwise
+        """
+        from config import settings
+        
+        try:
+            # Validate that we have at least 2 users for splitting
+            if len(splitwise_user_ids) < 2:
+                logger.warning(
+                    f"Cannot create Splitwise expense with only {len(splitwise_user_ids)} user(s). "
+                    f"Splitwise requires at least 2 users to split an expense."
+                )
+                return None
+            
+            # Prepare expense data
+            expense_date = date or datetime.utcnow()
+            
+            # Calculate split amounts
+            if split_method == "equal":
+                split_amount = amount / len(splitwise_user_ids) if splitwise_user_ids else amount
+            else:
+                # For now, only support equal split
+                split_amount = amount / len(splitwise_user_ids) if splitwise_user_ids else amount
+            
+            # Determine who paid (default to current user/creator if not specified)
+            # Ensure paid_by is a string for comparison
+            paid_by = str(paid_by_user_id) if paid_by_user_id else (str(splitwise_user_ids[0]) if splitwise_user_ids else None)
+            
+            # Use Splitwise SDK correctly (as per user's example)
+            # Create Splitwise client
+            logger.debug(f"Creating Splitwise client with consumer key: {settings.splitwise_consumer_key[:10]}...")
+            s_obj = Splitwise(
+                settings.splitwise_consumer_key,
+                settings.splitwise_consumer_secret
+            )
+            # Set access token using setAccessToken method
+            # The library expects a dictionary with oauth_token and oauth_token_secret
+            logger.debug(f"Setting access token (token preview: {access_token[:10] if access_token else 'None'}...)")
+            token_dict = {
+                'oauth_token': access_token,
+                'oauth_token_secret': access_token_secret
+            }
+            s_obj.setAccessToken(token_dict)
+            logger.debug("✓ Access token set successfully")
+            
+            # Create expense object
+            expense = Expense()
+            expense.setCost(f"{amount:.2f}")
+            expense.setDescription(description)
+            # Set date as string in ISO format
+            expense.setDate(expense_date.strftime("%Y-%m-%dT%H:%M:%SZ"))
+            
+            if group_id:
+                expense.setGroupId(int(group_id))
+            
+            if notes:
+                expense.setDetails(notes)
+            
+            # IMPORTANT: All group members are included by default (as per user requirement)
+            # Build users array using ExpenseUser objects
+            expense_users = []
+            for sw_user_id in splitwise_user_ids:
+                # Ensure sw_user_id is a string for comparison
+                sw_user_id_str = str(sw_user_id)
+                expense_user = ExpenseUser()
+                expense_user.setId(int(sw_user_id_str))
+                
+                if sw_user_id_str == paid_by:
+                    # Person who paid: they paid the full amount, but only owe their share
+                    expense_user.setPaidShare(f"{amount:.2f}")
+                    expense_user.setOwedShare(f"{split_amount:.2f}")
+                else:
+                    # Others: didn't pay anything, owe their share
+                    expense_user.setPaidShare("0.00")
+                    expense_user.setOwedShare(f"{split_amount:.2f}")
+                
+                expense_users.append(expense_user)
+            
+            # Set users using setUsers method (not addUser)
+            expense.setUsers(expense_users)
+            
+            # Verify the math
+            total_paid = sum(float(u.getPaidShare()) for u in expense_users)
+            total_owed = sum(float(u.getOwedShare()) for u in expense_users)
+            logger.debug(f"Expense validation: cost={amount}, total_paid={total_paid:.2f}, total_owed={total_owed:.2f}, users_count={len(expense_users)}")
+            
+            # Create expense using SDK
+            logger.debug(f"Creating Splitwise expense: {description} (€{amount:.2f}) with {len(expense_users)} users")
+            created_expense, errors = s_obj.createExpense(expense)
+            
+            if errors:
+                error_messages = []
+                # Handle errors - could be a list, string, or other type
+                if isinstance(errors, (list, tuple)):
+                    for error in errors:
+                        if hasattr(error, 'getMessage'):
+                            error_messages.append(error.getMessage())
+                        else:
+                            error_messages.append(str(error))
+                elif isinstance(errors, str):
+                    error_messages.append(errors)
+                else:
+                    error_messages.append(str(errors))
+                
+                error_text = "; ".join(error_messages) if error_messages else str(errors)
+                logger.error(f"Splitwise SDK returned errors: {error_text}")
+                logger.debug(f"Full error response: {errors} (type: {type(errors)})")
+                return None
+            
+            if created_expense:
+                expense_id = str(created_expense.getId())
+                logger.info(
+                    f"Created Splitwise expense: {description} "
+                    f"(€{amount:.2f}) - ID: {expense_id}"
+                )
+                return expense_id
+            else:
+                logger.error("Splitwise SDK returned no expense")
+                return None
+                
+        except Exception as e:
+            import traceback
+            logger.error(f"Failed to create Splitwise expense: {type(e).__name__}: {e}")
+            logger.debug(f"Error details: {str(e)}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+            return None
+    
+    async def get_current_user_id(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+    ) -> Optional[str]:
+        """
+        Get the current user's Splitwise user ID from the API.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            
+        Returns:
+            Splitwise user ID if successful, None otherwise
+        """
+        from requests_oauthlib import OAuth1Session
+        from config import settings
+        
+        try:
+            # Create OAuth session
+            oauth = OAuth1Session(
+                settings.splitwise_consumer_key,
+                client_secret=settings.splitwise_consumer_secret,
+                resource_owner_key=access_token,
+                resource_owner_secret=access_token_secret
+            )
+            
+            # Get current user info
+            response = oauth.get("https://secure.splitwise.com/api/v3.0/get_current_user")
+            response.raise_for_status()
+            user_data = response.json()
+            
+            if "user" in user_data and "id" in user_data["user"]:
+                splitwise_user_id = str(user_data["user"]["id"])
+                logger.info(f"Retrieved Splitwise user ID {splitwise_user_id} for user {user_id}")
+                return splitwise_user_id
+            else:
+                logger.warning("Splitwise API response missing user ID")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to get current user ID for {user_id}: {e}")
+            return None
+    
+    async def get_group_members(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+        group_id: str,
+    ) -> List[Dict]:
+        """
+        Get all members of a Splitwise group.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            group_id: Splitwise group ID
+            
+        Returns:
+            List of group member dictionaries with id, first_name, last_name, email
+        """
+        from requests_oauthlib import OAuth1Session
+        from config import settings
+        
+        try:
+            # Create OAuth session
+            oauth = OAuth1Session(
+                settings.splitwise_consumer_key,
+                client_secret=settings.splitwise_consumer_secret,
+                resource_owner_key=access_token,
+                resource_owner_secret=access_token_secret
+            )
+            
+            # Get group details
+            response = oauth.get(f"https://secure.splitwise.com/api/v3.0/get_group/{group_id}")
+            response.raise_for_status()
+            data = response.json()
+            
+            group = data.get("group", {})
+            members = group.get("members", [])
+            
+            member_list = [
+                {
+                    "id": str(member.get("id", "")),
+                    "first_name": member.get("first_name", ""),
+                    "last_name": member.get("last_name", ""),
+                    "email": member.get("email", ""),
+                }
+                for member in members
+            ]
+            
+            logger.info(f"Retrieved {len(member_list)} members from Splitwise group {group_id}")
+            return member_list
+            
+        except Exception as e:
+            logger.error(f"Failed to get group members for group {group_id}: {e}")
             return []
 

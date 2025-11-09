@@ -13,6 +13,8 @@ from api.serializers import (
     HouseholdResponse,
     UpdateUserPreferencesRequest,
     UpdatePreferencesResponse,
+    UpdateHouseholdRequest,
+    UserUpdateRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -48,6 +50,12 @@ async def get_user(user_id: str):
     Get a user's information by user_id.
     """
     return await controller.get_user_by_id(user_id)
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, request: UserUpdateRequest):
+    """Update arbitrary fields for a user."""
+    return await controller.update_user(user_id, request)
 
 
 @router.post("/users/{user_id}/households", response_model=HouseholdResponse, status_code=201)
@@ -114,4 +122,26 @@ async def update_user_preferences_endpoint(
     (e.g., "milk" and "dairy" are treated as the same).
     """
     return await controller.update_user_preferences(user_id, request)
+
+
+@router.patch("/users/{user_id}/households/{household_id}", response_model=HouseholdResponse)
+async def update_household_endpoint(
+    user_id: str,
+    household_id: str,
+    request: UpdateHouseholdRequest,
+):
+    """
+    Update household information.
+    
+    This is a generic endpoint to update household data based on user_id and household_id.
+    Only members of the household can update it.
+    
+    **Example**: Update Splitwise group ID:
+    ```json
+    {
+        "splitwise_group_id": "123456"
+    }
+    ```
+    """
+    return await controller.update_household(user_id, household_id, request)
 

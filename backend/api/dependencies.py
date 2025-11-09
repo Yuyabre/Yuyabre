@@ -11,10 +11,11 @@ from modules.user import UserService
 from modules.discord import DiscordService
 
 # Initialize services as singletons
+# Instantiate Discord first so GroceryAgent can reuse the same instance
+discord_service = DiscordService()  # Shared Discord service instance for bot and messaging
 agent = GroceryAgent()
 inventory_service = InventoryService()
 ordering_service = OrderingService()
 splitwise_service = SplitwiseService()
 user_service = UserService()
-discord_service = DiscordService()  # Shared Discord service instance for bot and messaging
 

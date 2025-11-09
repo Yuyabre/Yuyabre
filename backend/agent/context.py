@@ -35,6 +35,24 @@ async def build_system_prompt_with_context(user_id: Optional[str] = None) -> str
     if user.email:
         context_parts.append(f"Email: {user.email}")
     
+    # Add phone if available
+    if user.phone:
+        context_parts.append(f"Phone: {user.phone}")
+    
+    # Add household information
+    if user.household_id:
+        context_parts.append(f"Household ID: {user.household_id}")
+    
+    # Add Splitwise integration status
+    if user.splitwise_user_id:
+        context_parts.append(f"Splitwise User ID: {user.splitwise_user_id}")
+    if user.splitwise_access_token and user.splitwise_access_token_secret:
+        context_parts.append("Splitwise: Connected (OAuth tokens available)")
+    
+    # Add Discord integration status
+    if user.discord_user_id:
+        context_parts.append(f"Discord User ID: {user.discord_user_id}")
+    
     # Add preferences if they exist
     prefs = user.preferences
     if prefs.dietary_restrictions:
@@ -45,6 +63,11 @@ async def build_system_prompt_with_context(user_id: Optional[str] = None) -> str
         context_parts.append(f"Preferred brands: {', '.join(prefs.favorite_brands)}")
     if prefs.disliked_items:
         context_parts.append(f"Disliked items: {', '.join(prefs.disliked_items)}")
+    
+    # Add account status
+    context_parts.append(f"Account Status: {'Active' if user.is_active else 'Inactive'}")
+    if user.joined_date:
+        context_parts.append(f"Joined: {user.joined_date.strftime('%Y-%m-%d')}")
     
     # Always include user context, even if just the name
     user_context = "\n".join(context_parts)

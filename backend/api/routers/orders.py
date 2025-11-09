@@ -29,3 +29,17 @@ async def cancel_order(order_id: str):
     """Cancel an order."""
     return await controller.cancel_order(order_id)
 
+
+@router.get("/users/{user_id}", response_model=List[Order])
+async def get_user_orders(user_id: str, limit: int = 50):
+    """
+    Get all orders for a specific user.
+    
+    This includes:
+    - Orders created by the user
+    - Group orders from the user's household
+    
+    Returns orders sorted by timestamp (most recent first).
+    """
+    return await controller.get_orders_for_user(user_id, limit)
+
