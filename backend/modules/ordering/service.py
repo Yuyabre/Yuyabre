@@ -7,15 +7,18 @@ whether Thuisbezorgd provides an API or requires web scraping.
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from loguru import logger
+import math
 
 from models.order import Order, OrderItem, OrderStatus
 from models.inventory import InventoryItem
 from models.user import User
 from models.household import Household
+from models.store import Store
 from modules.whatsapp import WhatsAppService
 from modules.discord import DiscordService
 from modules.user_inventory.service import UserInventoryService
 from modules.splitwise import SplitwiseService
+from modules.grocery_stores import GroceryStoreService
 from beanie.operators import In
 from config import settings
 from utils.cache import get_order_cache, cached_query
@@ -44,6 +47,8 @@ class OrderingService:
             self.discord_service = DiscordService()
         self.user_inventory_service = UserInventoryService()
         self.splitwise_service = SplitwiseService()
+        self.grocery_store_service = GroceryStoreService()
+        self._preferred_store_cache: Dict[str, str] = {}
         logger.info("Ordering service initialized with cache")
     
     async def _invalidate_cache(self) -> None:
@@ -191,24 +196,53 @@ class OrderingService:
             logger.debug(traceback.format_exc())
             return None
     
-    async def search_products(self, query: str) -> List[Dict]:
+    async def search_products(
+        self,
+        query: str,
+        household_id: Optional[str] = None
+    ) -> List[Dict]:
         """
-        Search for products on Thuisbezorgd.
+        Search for products, checking nearest store inventory first, then fallback.
         
         Args:
             query: Search query (e.g., "milk", "eggs")
+            household_id: Optional household ID to search in nearest stores
             
         Returns:
             List of product dictionaries with id, name, price, etc.
-            
-        TODO: Implement actual search logic based on available API/scraping method
         """
         logger.info(f"Searching for products: {query}")
         
-        # PLACEHOLDER IMPLEMENTATION
-        # This should be replaced with actual API calls or web scraping
+        # First, try to find products in nearest stores' cached inventory
+        if household_id:
+            try:
+                preferred_store = await self._get_preferred_store(household_id)
+                if preferred_store:
+                    store_products = await self._search_products_in_store(
+                        store=preferred_store,
+                        query=query,
+                        max_results=10,
+                    )
+
+                    if store_products:
+                        logger.info(
+                            f"Found {len(store_products)} products in preferred store "
+                            f"{preferred_store.name} for '{query}'"
+                        )
+                        return store_products
+            except Exception as e:
+                logger.warning(f"Error searching store inventory: {e}, falling back to default search")
         
-        # Example return structure:
+        # Fallback: Search in Flink mock menu
+        logger.debug(f"Using Flink mock menu fallback for '{query}'")
+        flink_products = await self._search_flink_mock_menu(query)
+        
+        if flink_products:
+            logger.info(f"Found {len(flink_products)} products in Flink mock menu for '{query}'")
+            return flink_products
+        
+        # Final fallback: return placeholder
+        logger.warning(f"No products found in Flink mock menu for '{query}', using placeholder")
         return [
             {
                 "product_id": "prod_123",
@@ -218,7 +252,8 @@ class OrderingService:
                 "unit": "piece",
                 "available": True,
                 "brand": "Sample Brand",
-                "image_url": "https://example.com/image.jpg"
+                "image_url": "https://example.com/image.jpg",
+                "source": "fallback",
             }
         ]
     
@@ -227,16 +262,63 @@ class OrderingService:
         Get detailed information about a specific product.
         
         Args:
-            product_id: Thuisbezorgd product ID
+            product_id: Product ID (can be from Flink mock menu or other sources)
             
         Returns:
             Product details dictionary or None if not found
-            
-        TODO: Implement actual product details retrieval
         """
         logger.info(f"Getting product details: {product_id}")
         
-        # PLACEHOLDER IMPLEMENTATION
+        # Try to find in Flink mock menu
+        try:
+            import json
+            from pathlib import Path
+            
+            # Get the path to the flink_mock_menu.json file
+            current_dir = Path(__file__).parent.parent
+            flink_menu_path = current_dir / "grocery_stores" / "flink_mock_menu.json"
+            
+            if flink_menu_path.exists():
+                # Load JSON file (cache it to avoid reloading every time)
+                if not hasattr(self, '_flink_menu_cache'):
+                    with open(flink_menu_path, 'r', encoding='utf-8') as f:
+                        self._flink_menu_cache = json.load(f)
+                
+                items = self._flink_menu_cache.get('items', [])
+                
+                # Find product by ID
+                for item in items:
+                    if item.get('product_id') == product_id:
+                        # Convert unit format
+                        unit_obj = item.get('unit')
+                        if unit_obj is None:
+                            unit_str = "piece"
+                        elif isinstance(unit_obj, dict):
+                            unit_value = unit_obj.get('Value', 1.0)
+                            unit_type = unit_obj.get('Unit', 'piece')
+                            if unit_type:
+                                unit_str = f"{unit_value} {unit_type}" if unit_value != 1.0 else unit_type
+                            else:
+                                unit_str = "piece"
+                        else:
+                            unit_str = str(unit_obj)
+                        
+                        return {
+                            "product_id": item.get('product_id', ''),
+                            "name": item.get('name', ''),
+                            "description": f"{item.get('brand', '')} {item.get('name', '')}".strip(),
+                            "price": item.get('price', 0.0),
+                            "unit": unit_str,
+                            "available": item.get('available', True),
+                            "brand": item.get('brand'),
+                            "category": item.get('category'),
+                            "source": "flink_mock_menu",
+                        }
+        except Exception as e:
+            logger.warning(f"Error looking up product in Flink mock menu: {e}")
+        
+        # Fallback: return placeholder
+        logger.debug(f"Product {product_id} not found in Flink mock menu, using placeholder")
         return {
             "product_id": product_id,
             "name": "Sample Product",
@@ -245,6 +327,7 @@ class OrderingService:
             "unit": "piece",
             "available": True,
             "brand": "Sample Brand",
+            "source": "fallback",
         }
     
     async def create_order(
@@ -374,6 +457,49 @@ class OrderingService:
             if household and hasattr(household, 'household_id'):
                 household_id_value = household.household_id
             
+            # Extract store information from items (if available)
+            store_id = None
+            store_name = None
+            store_location = None
+            for item_data in items:
+                if item_data.get("store_id"):
+                    store_id = item_data.get("store_id")
+                    store_name = item_data.get("store_name")
+                    # Try to get store location from grocery store service
+                    if store_id:
+                        try:
+                            from models.store import Store
+                            store = await Store.find_one(Store.store_id == store_id)
+                            if store and store.location:
+                                store_location = {
+                                    "latitude": store.location.latitude,
+                                    "longitude": store.location.longitude,
+                                }
+                        except Exception as e:
+                            logger.debug(f"Could not fetch store location: {e}")
+                    break
+            
+            # Calculate estimated delivery time and distance if we have store and household location
+            estimated_delivery_time = None
+            distance_km = None
+            if store_location and household:
+                try:
+                    # Get household location (would need geocoding in real implementation)
+                    # For now, use city/postal_code to estimate
+                    household_location = await self._get_household_location(household)
+                    if household_location:
+                        distance_km = self._calculate_distance(
+                            store_location["latitude"],
+                            store_location["longitude"],
+                            household_location["latitude"],
+                            household_location["longitude"],
+                        )
+                        # Estimate delivery time: base 10 min + 2 min per km
+                        estimated_minutes = 10 + (distance_km * 2)
+                        estimated_delivery_time = datetime.utcnow() + timedelta(minutes=int(estimated_minutes))
+                except Exception as e:
+                    logger.debug(f"Could not calculate delivery time: {e}")
+            
             # Create Order object
             order = Order(
                 service="Thuisbezorgd",
@@ -384,6 +510,11 @@ class OrderingService:
                 status=OrderStatus.PENDING,
                 is_group_order=is_group_order,
                 household_id=household_id_value,
+                store_id=store_id,
+                store_name=store_name,
+                store_location=store_location,
+                estimated_delivery_time=estimated_delivery_time,
+                distance_km=distance_km,
             )
             
             # Add items to order
@@ -630,6 +761,7 @@ class OrderingService:
         order_id: str,
         user_id: str,
         responses: Dict[str, Any],
+        response_event: Optional[Dict[str, Any]] = None,
     ) -> Optional[Order]:
         """
         Process a user's response to a group order.
@@ -638,6 +770,7 @@ class OrderingService:
             order_id: Order ID
             user_id: User ID who responded
             responses: Response data with items user wants
+            response_event: Optional event metadata to record for history
             
         Returns:
             Updated Order object if successful, None otherwise
@@ -653,6 +786,14 @@ class OrderingService:
         
         # Store user's response
         order.group_responses[user_id] = responses
+        
+        if response_event is not None:
+            event_record = dict(response_event)
+            event_record.setdefault("user_id", user_id)
+            event_record.setdefault("timestamp", datetime.utcnow().isoformat())
+            if "response" not in event_record:
+                event_record["response"] = responses.get("confirmed")
+            order.response_history.append(event_record)
         
         # Remove user from pending responses for items they responded to
         for item_name in list(order.pending_responses.keys()):
@@ -681,6 +822,45 @@ class OrderingService:
             await self._finalize_group_order(order)
         
         return order
+
+    async def get_group_order_status(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve the latest status and response details for a group order.
+        
+        Args:
+            order_id: Order identifier
+        
+        Returns:
+            Dictionary summarizing order status and responses, or None if not found.
+        """
+        order = await Order.find_one(Order.order_id == order_id)
+        if not order:
+            logger.warning(f"Group order status requested for unknown order: {order_id}")
+            return None
+        
+        return {
+            "order_id": order.order_id,
+            "status": order.status.value,
+            "total": order.total,
+            "created_at": order.timestamp.isoformat(),
+            "created_by": order.created_by,
+            "household_id": order.household_id,
+            "is_group_order": order.is_group_order,
+            "response_deadline": order.response_deadline.isoformat() if order.response_deadline else None,
+            "pending_responses": order.pending_responses,
+            "group_responses": order.group_responses,
+            "response_history": order.response_history,
+            "items": [
+                {
+                    "name": item.name,
+                    "quantity": item.quantity,
+                    "unit": item.unit,
+                    "price": item.price,
+                    "requested_by": item.requested_by,
+                }
+                for item in order.items
+            ],
+        }
     
     async def _finalize_group_order(self, order: Order) -> None:
         """
@@ -835,6 +1015,369 @@ class OrderingService:
         
         logger.info(f"Found {len(sorted_orders)} orders for user {user_id}")
         return sorted_orders
+    
+    async def _get_preferred_store(self, household_id: str) -> Optional[Store]:
+        """
+        Get (and cache) the preferred store for a household.
+        
+        Args:
+            household_id: Household identifier
+        
+        Returns:
+            Store object or None
+        """
+        cached_store_id = self._preferred_store_cache.get(household_id)
+        if cached_store_id:
+            store = await Store.find_one(Store.store_id == cached_store_id)
+            if store:
+                return store
+            # Remove stale cache entry
+            self._preferred_store_cache.pop(household_id, None)
+        
+        stores = await self.grocery_store_service.find_nearest_stores(
+            household_id=household_id,
+            limit=1,
+        )
+        if stores:
+            store = stores[0]
+            self._preferred_store_cache[household_id] = store.store_id
+            return store
+        return None
+    
+    async def _search_products_in_store(
+        self,
+        store: Store,
+        query: str,
+        max_results: int = 10,
+    ) -> List[Dict]:
+        """
+        Search for products in a specific store's cached inventory.
+        
+        Args:
+            store: Store object
+            query: Search term
+            max_results: Maximum number of results
+        
+        Returns:
+            List of product dictionaries
+        """
+        if not store:
+            return []
+        
+        try:
+            if store.location and store.location.city and store.location.postal_code:
+                postal_prefix = store.location.postal_code.split()[0] if store.location.postal_code and " " in store.location.postal_code else store.location.postal_code or ""
+                locality_key = f"{store.location.city.lower()}_{postal_prefix.lower()}"
+            else:
+                locality_key = store.store_id  # Fallback locality key
+            
+            inventory = await self.grocery_store_service.get_or_fetch_store_inventory(
+                store_id=store.store_id,
+                locality_key=locality_key,
+            )
+            
+            if not inventory or not inventory.products:
+                return []
+            
+            query_lower = query.lower()
+            matches: List[Dict[str, Any]] = []
+            for product in inventory.products:
+                name = product.name.lower()
+                description = (product.description or "").lower()
+                brand = (product.brand or "").lower()
+                
+                if query_lower in name or query_lower in description or query_lower in brand:
+                    matches.append(
+                        {
+                            "product_id": product.product_id,
+                            "name": product.name,
+                            "description": product.description or "",
+                            "price": product.price,
+                            "unit": product.unit,
+                            "available": product.available,
+                            "brand": product.brand,
+                            "image_url": product.image_url,
+                            "store_id": store.store_id,
+                            "store_name": store.name,
+                            "store_chain": store.chain,
+                            "source": "store_cache",
+                            "last_updated_in_store_cache": inventory.last_updated.isoformat(),
+                        }
+                    )
+                    
+                    if len(matches) >= max_results:
+                        break
+            
+            return matches
+        except Exception as e:
+            logger.warning(
+                f"Failed to search products in store {store.store_id}: {e}",
+                exc_info=True,
+            )
+            return []
+    
+    async def _search_flink_mock_menu(self, query: str, max_results: int = 10) -> List[Dict]:
+        """
+        Search for products in the Flink mock menu JSON file.
+        
+        Args:
+            query: Search query (e.g., "milk", "eggs")
+            max_results: Maximum number of results to return
+            
+        Returns:
+            List of product dictionaries
+        """
+        import json
+        from pathlib import Path
+        
+        try:
+            if not hasattr(self, "_flink_menu_cache"):
+                current_dir = Path(__file__).parent.parent
+                flink_menu_path = current_dir / "grocery_stores" / "flink_mock_menu.json"
+                
+                if not flink_menu_path.exists():
+                    logger.warning(f"Flink mock menu file not found at {flink_menu_path}")
+                    return []
+                
+                with open(flink_menu_path, "r", encoding="utf-8") as f:
+                    self._flink_menu_cache = json.load(f)
+                logger.debug(f"Loaded Flink mock menu with {len(self._flink_menu_cache.get('items', []))} items")
+            
+            items = self._flink_menu_cache.get("items", [])
+            query_lower = query.lower()
+            
+            matches: List[Dict[str, Any]] = []
+            for item in items:
+                if not item.get("available", True):
+                    continue
+                
+                name = item.get("name", "").lower()
+                brand = (item.get("brand") or "").lower()
+                category = (item.get("category") or "").lower()
+                
+                if query_lower in name or query_lower in brand or query_lower in category:
+                    unit_obj = item.get("unit")
+                    if unit_obj is None:
+                        unit_str = "piece"
+                    elif isinstance(unit_obj, dict):
+                        unit_value = unit_obj.get("Value", 1.0)
+                        unit_type = unit_obj.get("Unit", "piece")
+                        if unit_type:
+                            unit_str = f"{unit_value} {unit_type}" if unit_value != 1.0 else unit_type
+                        else:
+                            unit_str = "piece"
+                    else:
+                        unit_str = str(unit_obj)
+                    
+                    matches.append(
+                        {
+                            "product_id": item.get("product_id", ""),
+                            "name": item.get("name", ""),
+                            "description": f"{item.get('brand', '')} {item.get('name', '')}".strip(),
+                            "price": item.get("price", 0.0),
+                            "unit": unit_str,
+                            "available": item.get("available", True),
+                            "brand": item.get("brand"),
+                            "category": item.get("category"),
+                            "source": "flink_mock_menu",
+                        }
+                    )
+                    
+                    if len(matches) >= max_results:
+                        break
+            
+            return matches
+        except Exception as e:
+            logger.error(f"Error searching Flink mock menu: {e}", exc_info=True)
+            return []
+    
+    def _calculate_distance(
+        self,
+        lat1: float,
+        lon1: float,
+        lat2: float,
+        lon2: float,
+    ) -> float:
+        """
+        Calculate distance between two coordinates using Haversine formula.
+        
+        Args:
+            lat1, lon1: First point coordinates
+            lat2, lon2: Second point coordinates
+            
+        Returns:
+            Distance in kilometers
+        """
+        # Earth radius in kilometers
+        R = 6371.0
+        
+        # Convert to radians
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lon = math.radians(lon2 - lon1)
+        
+        # Haversine formula
+        a = (
+            math.sin(delta_lat / 2) ** 2
+            + math.cos(lat1_rad)
+            * math.cos(lat2_rad)
+            * math.sin(delta_lon / 2) ** 2
+        )
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c
+        
+        return round(distance, 2)
+    
+    async def _get_household_location(self, household: Any) -> Optional[Dict[str, float]]:
+        """
+        Get household location coordinates.
+        
+        In a real implementation, this would geocode the address.
+        For now, returns None if coordinates aren't available.
+        
+        Args:
+            household: Household object
+            
+        Returns:
+            Dict with latitude and longitude, or None
+        """
+        # TODO: Implement geocoding to convert address to coordinates
+        # For now, return None - we'll need to add lat/lon to household model or geocode
+        return None
+    
+    async def update_order_status_by_time(self, order: Order) -> Order:
+        """
+        Update order status based on elapsed time and distance.
+        
+        Status progression:
+        - PENDING -> CONFIRMED (immediately after creation)
+        - CONFIRMED -> PROCESSING (after 2 minutes)
+        - PROCESSING -> OUT_FOR_DELIVERY (after 5 minutes or when estimated time approaches)
+        - OUT_FOR_DELIVERY -> DELIVERED (when estimated time has passed)
+        
+        Args:
+            order: Order object to update
+            
+        Returns:
+            Updated Order object
+        """
+        if order.status == OrderStatus.DELIVERED or order.status == OrderStatus.CANCELLED:
+            return order  # Don't update completed orders
+        
+        now = datetime.utcnow()
+        elapsed = (now - order.timestamp).total_seconds() / 60  # minutes
+        
+        # Calculate estimated delivery time if not set
+        if not order.estimated_delivery_time and order.distance_km:
+            # Base 10 min + 2 min per km
+            estimated_minutes = 10 + (order.distance_km * 2)
+            order.estimated_delivery_time = order.timestamp + timedelta(minutes=int(estimated_minutes))
+        
+        # Status progression based on time
+        if order.status == OrderStatus.PENDING:
+            order.status = OrderStatus.CONFIRMED
+        elif order.status == OrderStatus.CONFIRMED and elapsed >= 2:
+            order.status = OrderStatus.PROCESSING
+        elif order.status == OrderStatus.PROCESSING:
+            # Move to out_for_delivery when we're close to estimated time or after 5 min
+            if order.estimated_delivery_time:
+                time_until_delivery = (order.estimated_delivery_time - now).total_seconds() / 60
+                if time_until_delivery <= 15 or elapsed >= 5:  # 15 min before ETA or 5 min elapsed
+                    order.status = OrderStatus.OUT_FOR_DELIVERY
+            elif elapsed >= 5:
+                order.status = OrderStatus.OUT_FOR_DELIVERY
+        elif order.status == OrderStatus.OUT_FOR_DELIVERY:
+            # Mark as delivered if estimated time has passed
+            if order.estimated_delivery_time and now >= order.estimated_delivery_time:
+                order.status = OrderStatus.DELIVERED
+                if not order.delivery_time:
+                    order.delivery_time = now
+        
+        await order.save()
+        return order
+    
+    async def get_order_eta(
+        self,
+        order_id: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get estimated time of arrival (ETA) for an order.
+        
+        Args:
+            order_id: Order ID
+            user_id: Optional user ID for validation
+            
+        Returns:
+            Dict with ETA information
+        """
+        order = await Order.find_one(Order.order_id == order_id)
+        if not order:
+            return {
+                "found": False,
+                "error": f"Order {order_id} not found",
+            }
+        
+        # Validate user access if user_id provided
+        if user_id:
+            if order.created_by != user_id and order.household_id:
+                # Check if user is in household
+                household = await Household.find_one(Household.household_id == order.household_id)
+                if not household or user_id not in household.member_ids:
+                    return {
+                        "found": False,
+                        "error": "You don't have access to this order",
+                    }
+        
+        # Update order status based on time
+        order = await self.update_order_status_by_time(order)
+        
+        now = datetime.utcnow()
+        
+        # Calculate ETA
+        if order.estimated_delivery_time:
+            time_remaining = (order.estimated_delivery_time - now).total_seconds() / 60  # minutes
+            if time_remaining <= 0:
+                eta_minutes = 0
+                eta_status = "delivered" if order.status == OrderStatus.DELIVERED else "arriving_soon"
+            else:
+                eta_minutes = int(time_remaining)
+                eta_status = "in_transit" if order.status == OrderStatus.OUT_FOR_DELIVERY else "preparing"
+        elif order.distance_km:
+            # Calculate ETA based on distance
+            estimated_minutes = 10 + (order.distance_km * 2)
+            time_elapsed = (now - order.timestamp).total_seconds() / 60
+            time_remaining = max(0, estimated_minutes - time_elapsed)
+            eta_minutes = int(time_remaining)
+            eta_status = "preparing" if order.status in [OrderStatus.CONFIRMED, OrderStatus.PROCESSING] else "in_transit"
+        else:
+            # No location data, estimate based on status
+            if order.status == OrderStatus.PENDING or order.status == OrderStatus.CONFIRMED:
+                eta_minutes = 30  # Default estimate
+                eta_status = "preparing"
+            elif order.status == OrderStatus.PROCESSING:
+                eta_minutes = 20
+                eta_status = "preparing"
+            elif order.status == OrderStatus.OUT_FOR_DELIVERY:
+                eta_minutes = 10
+                eta_status = "in_transit"
+            else:
+                eta_minutes = 0
+                eta_status = "delivered" if order.status == OrderStatus.DELIVERED else "unknown"
+        
+        return {
+            "found": True,
+            "order_id": order.order_id,
+            "status": order.status.value,
+            "eta_minutes": eta_minutes,
+            "eta_status": eta_status,
+            "estimated_delivery_time": order.estimated_delivery_time.isoformat() if order.estimated_delivery_time else None,
+            "distance_km": order.distance_km,
+            "store_name": order.store_name,
+            "current_time": now.isoformat(),
+            "order_placed_at": order.timestamp.isoformat(),
+        }
 
 
 class ThuisbezorgdScraper:
@@ -861,14 +1404,96 @@ class ThuisbezorgdScraper:
         logger.warning("Scraper login not implemented")
         return False
     
+    async def _search_flink_mock_menu(self, query: str, max_results: int = 10) -> List[Dict]:
+        """
+        Search for products in the Flink mock menu JSON file.
+        
+        Args:
+            query: Search query (e.g., "milk", "eggs")
+            max_results: Maximum number of results to return
+            
+        Returns:
+            List of product dictionaries
+        """
+        import json
+        import os
+        from pathlib import Path
+        
+        try:
+            # Get the path to the flink_mock_menu.json file
+            current_dir = Path(__file__).parent.parent
+            flink_menu_path = current_dir / "grocery_stores" / "flink_mock_menu.json"
+            
+            if not flink_menu_path.exists():
+                logger.warning(f"Flink mock menu file not found at {flink_menu_path}")
+                return []
+            
+            # Load JSON file (cache it to avoid reloading every time)
+            if not hasattr(self, '_flink_menu_cache'):
+                with open(flink_menu_path, 'r', encoding='utf-8') as f:
+                    self._flink_menu_cache = json.load(f)
+                logger.debug(f"Loaded Flink mock menu with {len(self._flink_menu_cache.get('items', []))} items")
+            
+            items = self._flink_menu_cache.get('items', [])
+            query_lower = query.lower()
+            
+            # Search for matching products
+            matches = []
+            for item in items:
+                if not item.get('available', True):
+                    continue
+                
+                # Search in name, brand, and category
+                name = item.get('name', '').lower()
+                brand = (item.get('brand') or '').lower()
+                category = (item.get('category') or '').lower()
+                
+                if query_lower in name or query_lower in brand or query_lower in category:
+                    # Convert unit format
+                    unit_obj = item.get('unit')
+                    if unit_obj is None:
+                        unit_str = "piece"
+                    elif isinstance(unit_obj, dict):
+                        # Format: {"Value": 1.0, "Unit": "l", "Quantity": 1}
+                        unit_value = unit_obj.get('Value', 1.0)
+                        unit_type = unit_obj.get('Unit', 'piece')
+                        quantity = unit_obj.get('Quantity', 1)
+                        if unit_type:
+                            unit_str = f"{unit_value} {unit_type}" if unit_value != 1.0 else unit_type
+                        else:
+                            unit_str = "piece"
+                    else:
+                        unit_str = str(unit_obj)
+                    
+                    matches.append({
+                        "product_id": item.get('product_id', ''),
+                        "name": item.get('name', ''),
+                        "description": f"{item.get('brand', '')} {item.get('name', '')}".strip(),
+                        "price": item.get('price', 0.0),
+                        "unit": unit_str,
+                        "available": item.get('available', True),
+                        "brand": item.get('brand'),
+                        "category": item.get('category'),
+                        "source": "flink_mock_menu",
+                    })
+                    
+                    if len(matches) >= max_results:
+                        break
+            
+            return matches
+            
+        except Exception as e:
+            logger.error(f"Error searching Flink mock menu: {e}", exc_info=True)
+            return []
+    
     async def search_products(self, query: str) -> List[Dict]:
         """
         Search for products by scraping the website.
         
         TODO: Implement product search scraping
         """
-        logger.warning("Scraper search not implemented")
-        return []
+        logger.warning("Scraper search not implemented, using Flink mock menu fallback")
+        return await self._search_flink_mock_menu(query)
     
     async def place_order(self, items: List[Dict]) -> Optional[str]:
         """

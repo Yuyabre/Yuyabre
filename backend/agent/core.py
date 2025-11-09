@@ -76,7 +76,11 @@ class GroceryAgent:
             "send_whatsapp_message": self.tool_handlers_obj.send_whatsapp_message,
             "get_housemates": self.tool_handlers_obj.get_housemates,
             "send_discord_message": self.tool_handlers_obj.send_discord_message,
+            "check_discord_message_responses": self.tool_handlers_obj.check_discord_message_responses,
             "create_splitwise_expense": self.tool_handlers_obj.create_splitwise_expense,
+            "get_splitwise_expenses": self.tool_handlers_obj.get_splitwise_expenses,
+            "get_group_order_status": self.tool_handlers_obj.get_group_order_status,
+            "get_order_eta": self.tool_handlers_obj.get_order_eta,
         }
 
         # Initialize conversation manager

@@ -2,7 +2,7 @@
 Order Model - MongoDB schema for tracking grocery orders.
 """
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from enum import Enum
 from beanie import Document
 from pydantic import BaseModel, Field
@@ -81,6 +81,7 @@ class Order(Document):
         response_deadline: Deadline for housemates to respond
         group_responses: Dict mapping user_id to their response data
         whatsapp_message_sent: Whether WhatsApp notification was sent
+        response_history: List of response events (for audit and agent context)
     """
     
     order_id: str = Field(default_factory=lambda: str(uuid4()))
@@ -97,12 +98,18 @@ class Order(Document):
     splitwise_expense_id: Optional[str] = None
     notes: Optional[str] = None
     created_by: Optional[str] = None
+    store_id: Optional[str] = None  # Store ID where order was placed
+    store_name: Optional[str] = None  # Store name
+    store_location: Optional[Dict[str, float]] = None  # Store coordinates: {"latitude": float, "longitude": float}
+    estimated_delivery_time: Optional[datetime] = None  # Calculated ETA based on distance
+    distance_km: Optional[float] = None  # Distance from store to delivery address in km
     is_group_order: bool = Field(default=False)
     household_id: Optional[str] = None
     pending_responses: Dict[str, List[str]] = Field(default_factory=dict)  # item_name -> [user_ids]
     response_deadline: Optional[datetime] = None
     group_responses: Dict[str, Dict] = Field(default_factory=dict)  # user_id -> response data
     whatsapp_message_sent: bool = Field(default=False)
+    response_history: List[Dict[str, Any]] = Field(default_factory=list)
     
     class Settings:
         name = "orders"

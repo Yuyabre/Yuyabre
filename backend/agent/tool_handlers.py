@@ -228,7 +228,12 @@ class ToolHandlers:
             
             # Search for products using the original name or inventory item name
             search_name = inventory_item.name if inventory_item else name
-            products = await self.ordering_service.search_products(search_name)
+            # Get household_id if user has one
+            household_id = None
+            if user and user.household_id:
+                household_id = user.household_id
+            
+            products = await self.ordering_service.search_products(search_name, household_id=household_id)
             if not products:
                 missing_products.append(
                     {"name": name, "reason": "No matching products found"}
@@ -389,6 +394,48 @@ class ToolHandlers:
                 for order in orders
             ],
         }
+    
+    async def get_group_order_status(
+        self,
+        *,
+        order_id: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return the latest status and responses for a group order."""
+        if not order_id:
+            return {"error": "order_id is required."}
+        
+        summary = await self.ordering_service.get_group_order_status(order_id)
+        if not summary:
+            return {"error": f"Order {order_id} not found."}
+        
+        return summary
+    
+    async def get_order_eta(
+        self,
+        *,
+        order_id: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get the estimated time of arrival (ETA) for a delivery order.
+        
+        Args:
+            order_id: Order ID
+            user_id: User ID (automatically provided)
+            
+        Returns:
+            Dict with ETA information
+        """
+        if not order_id:
+            return {"error": "order_id is required."}
+        
+        result = await self.ordering_service.get_order_eta(
+            order_id=order_id,
+            user_id=user_id,
+        )
+        
+        return result
     
     async def update_user_preferences(
         self,
@@ -939,14 +986,16 @@ class ToolHandlers:
             },
         )
         
-        message_id = next((mid for mid in results.values() if mid is not None), None)
+        message_id = next((mid for mid in results.values() if mid is not None and mid != "webhook"), None)
+        context_id = results.get("context_id")
         
-        if message_id:
-            logger.info(f"Discord message sent successfully. Message reference: {message_id}")
+        if message_id or context_id:
+            logger.info(f"Discord message sent successfully. Message ID: {message_id}, Context ID: {context_id}")
             return {
                 "success": True,
                 "message": f"Discord message sent to household channel",
                 "message_id": message_id,
+                "context_id": context_id,  # Return context_id so agent can check responses
             }
         else:
             logger.error(f"Failed to send Discord message to channel {household.discord_channel_id}")
@@ -955,6 +1004,50 @@ class ToolHandlers:
                 "success": False,
                 "error": "Failed to send Discord message. Check server logs for details. Possible causes: bot not ready, invalid channel ID, or missing permissions.",
             }
+    
+    async def check_discord_message_responses(
+        self,
+        context_id: Optional[str] = None,
+        message_id: Optional[int] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Check responses to a Discord message sent in the current session.
+        
+        Args:
+            context_id: The context ID returned from send_discord_message
+            message_id: The Discord message ID (alternative to context_id)
+            user_id: ID of the user (required to filter by user)
+            
+        Returns:
+            Dict with response information
+        """
+        if not self.discord_service.is_configured():
+            return {
+                "found": False,
+                "error": "Discord service is not configured.",
+            }
+        
+        if not user_id:
+            return {
+                "found": False,
+                "error": "user_id is required to check Discord message responses",
+            }
+        
+        if not context_id and not message_id:
+            return {
+                "found": False,
+                "error": "Either context_id or message_id must be provided",
+            }
+        
+        # Get responses from Discord service
+        result = await self.discord_service.get_message_responses(
+            context_id=context_id,
+            message_id=message_id,
+            user_id=user_id,
+        )
+        
+        return result
     
     async def create_splitwise_expense(
         self,
@@ -1121,5 +1214,63 @@ class ToolHandlers:
             return {
                 "success": False,
                 "error": f"Error creating Splitwise expense: {str(e)}",
+            }
+    
+    async def get_splitwise_expenses(
+        self,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get all expenses from Splitwise for the current user.
+        
+        Args:
+            user_id: ID of the user requesting the expenses
+            
+        Returns:
+            Dict with list of expenses or error message
+        """
+        if not user_id:
+            return {
+                "success": False,
+                "error": "User ID is required to get Splitwise expenses",
+            }
+        
+        # Get user to check authorization
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": f"User {user_id} not found",
+            }
+        
+        # Check if user has Splitwise OAuth tokens
+        if not user.splitwise_access_token or not user.splitwise_access_token_secret:
+            return {
+                "success": False,
+                "error": "User is not authorized with Splitwise. Please connect your Splitwise account first.",
+            }
+        
+        try:
+            # Get all expenses using Splitwise service
+            expenses_data = await self.splitwise_service.get_user_expenses(
+                user_id=user_id,
+                access_token=user.splitwise_access_token,
+                access_token_secret=user.splitwise_access_token_secret,
+            )
+            
+            logger.info(f"Successfully retrieved {len(expenses_data)} Splitwise expenses for user {user_id}")
+            return {
+                "success": True,
+                "expenses": expenses_data,
+                "count": len(expenses_data),
+            }
+                
+        except Exception as e:
+            logger.error(f"Error getting Splitwise expenses for user {user_id}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return {
+                "success": False,
+                "error": f"Error retrieving Splitwise expenses: {str(e)}",
             }
 

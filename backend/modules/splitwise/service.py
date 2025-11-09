@@ -565,6 +565,99 @@ class SplitwiseService:
             logger.debug(f"Traceback: {traceback.format_exc()}")
             return None
     
+    async def get_user_expenses(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+    ) -> List[Dict]:
+        """
+        Get all expenses for a user from Splitwise using user's OAuth tokens.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            
+        Returns:
+            List of expense dictionaries if successful, empty list otherwise
+        """
+        from config import settings
+        
+        try:
+            # Create Splitwise client
+            logger.debug(f"Creating Splitwise client to get all expenses for user {user_id}")
+            s_obj = Splitwise(
+                settings.splitwise_consumer_key,
+                settings.splitwise_consumer_secret
+            )
+            
+            # Set access token
+            logger.debug(f"Setting access token for user {user_id}")
+            token_dict = {
+                'oauth_token': access_token,
+                'oauth_token_secret': access_token_secret
+            }
+            s_obj.setAccessToken(token_dict)
+            
+            # Get all expenses using SDK
+            logger.info(f"Fetching all Splitwise expenses for user {user_id}")
+            expenses = s_obj.getExpenses()
+            
+            if not expenses:
+                logger.info(f"No expenses found for user {user_id}")
+                return []
+            
+            # Extract expense details for each expense
+            expenses_data = []
+            for expense in expenses:
+                try:
+                    expense_data = {
+                        "expense_id": str(expense.getId()),
+                        "description": expense.getDescription(),
+                        "cost": expense.getCost(),
+                        "currency_code": expense.getCurrencyCode(),
+                        "date": expense.getDate(),
+                        "created_at": expense.getCreatedAt(),
+                        "updated_at": expense.getUpdatedAt(),
+                        "category": {
+                            "id": expense.getCategory().getId() if expense.getCategory() else None,
+                            "name": expense.getCategory().getName() if expense.getCategory() else None,
+                        } if expense.getCategory() else None,
+                        "group_id": str(expense.getGroupId()) if expense.getGroupId() else None,
+                        "details": expense.getDetails(),
+                        "payment": expense.getPayment(),
+                        "is_repeat": expense.isRepeat(),
+                        "users": []
+                    }
+                    
+                    # Extract user information from expense
+                    expense_users = expense.getUsers()
+                    if expense_users:
+                        for user in expense_users:
+                            user_data = {
+                                "user_id": str(user.getId()),
+                                "paid_share": user.getPaidShare(),
+                                "owed_share": user.getOwedShare(),
+                                "net_balance": user.getNetBalance(),
+                            }
+                            expense_data["users"].append(user_data)
+                    
+                    expenses_data.append(expense_data)
+                except Exception as e:
+                    logger.warning(f"Error processing expense {expense.getId() if hasattr(expense, 'getId') else 'unknown'}: {e}")
+                    continue
+            
+            logger.info(f"Successfully retrieved {len(expenses_data)} expenses for user {user_id}")
+            return expenses_data
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Failed to get Splitwise expenses for user {user_id}: {type(e).__name__}: {e}")
+            logger.debug(f"Error details: {str(e)}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+            return []
+    
     async def get_current_user_id(
         self,
         user_id: str,
