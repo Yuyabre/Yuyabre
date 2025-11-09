@@ -1,0 +1,147 @@
+"""
+Router for user-related endpoints and authentication.
+"""
+from fastapi import APIRouter
+
+from api.controllers.user_controller import UserController
+from api.serializers import (
+    SignupRequest,
+    LoginRequest,
+    UserResponse,
+    JoinHouseholdRequest,
+    CreateHouseholdRequest,
+    HouseholdResponse,
+    UpdateUserPreferencesRequest,
+    UpdatePreferencesResponse,
+    UpdateHouseholdRequest,
+    UserUpdateRequest,
+)
+
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+controller = UserController()
+
+
+@router.post("/signup", response_model=UserResponse, status_code=201)
+async def signup(request: SignupRequest):
+    """
+    Create a new user account.
+    
+    This endpoint allows new users to register with email and password.
+    
+    **Note**: Email is optional but recommended for account recovery.
+    """
+    return await controller.signup(request)
+
+
+@router.post("/login", response_model=UserResponse)
+async def login(request: LoginRequest):
+    """
+    Authenticate a user with email and password.
+    
+    Returns the user information upon successful authentication.
+    """
+    return await controller.login(request)
+
+
+@router.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: str):
+    """
+    Get a user's information by user_id.
+    """
+    return await controller.get_user_by_id(user_id)
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, request: UserUpdateRequest):
+    """Update arbitrary fields for a user."""
+    return await controller.update_user(user_id, request)
+
+
+@router.post("/users/{user_id}/households", response_model=HouseholdResponse, status_code=201)
+async def create_household_endpoint(
+    user_id: str,
+    request: CreateHouseholdRequest,
+):
+    """
+    Create a new household for a user.
+    
+    This endpoint allows a user to create a new household if they don't have an invite code.
+    The invite code is automatically generated and returned in the response.
+    
+    **Note**: A user can only belong to one household at a time.
+    """
+    return await controller.create_household(user_id, request)
+
+
+@router.get("/households/{household_id}", response_model=HouseholdResponse)
+async def get_household(household_id: str):
+    """
+    Get household information by household_id.
+    
+    Returns all household metadata including the invite code, address, members, etc.
+    """
+    return await controller.get_household_by_id(household_id)
+
+
+@router.post("/users/{user_id}/join-household")
+async def join_household_endpoint(
+    user_id: str,
+    request: JoinHouseholdRequest,
+):
+    """
+    Add a user to a household using an invite code.
+    
+    The invite code is generated when a household is first created. Users must provide
+    the correct invite code to join a household.
+    
+    **Note**: A user can only belong to one household at a time.
+    """
+    return await controller.join_household(user_id, request)
+
+
+@router.patch("/users/{user_id}/preferences", response_model=UpdatePreferencesResponse)
+async def update_user_preferences_endpoint(
+    user_id: str,
+    request: UpdateUserPreferencesRequest,
+):
+    """
+    Update a user's dietary preferences, allergies, favorite brands, or disliked items.
+    
+    This endpoint supports both adding and removing preferences:
+    - Use `dietary_restrictions`, `allergies`, `favorite_brands`, `disliked_items` to ADD items
+    - Use `remove_dietary_restrictions`, `remove_allergies`, `remove_favorite_brands`, `remove_disliked_items` to REMOVE items
+    
+    **Examples**:
+    - Add allergy: `{"allergies": ["peanuts"]}`
+    - Remove allergy: `{"remove_allergies": ["peanuts"]}`
+    - Add dietary restriction: `{"dietary_restrictions": ["vegetarian"]}`
+    - Add favorite brand: `{"favorite_brands": ["Melkunie"]}`
+    
+    **Note**: Duplicate items are automatically filtered out. Allergy names are normalized
+    (e.g., "milk" and "dairy" are treated as the same).
+    """
+    return await controller.update_user_preferences(user_id, request)
+
+
+@router.patch("/users/{user_id}/households/{household_id}", response_model=HouseholdResponse)
+async def update_household_endpoint(
+    user_id: str,
+    household_id: str,
+    request: UpdateHouseholdRequest,
+):
+    """
+    Update household information.
+    
+    This is a generic endpoint to update household data based on user_id and household_id.
+    Only members of the household can update it.
+    
+    **Example**: Update Splitwise group ID:
+    ```json
+    {
+        "splitwise_group_id": "123456"
+    }
+    ```
+    """
+    return await controller.update_household(user_id, household_id, request)
+
