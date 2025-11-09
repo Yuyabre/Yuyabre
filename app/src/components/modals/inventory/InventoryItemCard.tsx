@@ -30,6 +30,8 @@ export function InventoryItemCard({ item }: InventoryItemCardProps) {
   const updateMutation = useUpdateInventoryItem();
   const deleteMutation = useDeleteInventoryItem();
   const currentUser = useStore((state) => state.currentUser);
+  const isOwner = item.user_id === currentUser?.user_id;
+  const isSharedFromOthers = item.shared && !isOwner;
 
   const isLowStock = item.quantity <= item.threshold;
   const isExpiringSoon =
@@ -120,10 +122,14 @@ export function InventoryItemCard({ item }: InventoryItemCardProps) {
             {item.brand && <span>Brand: {item.brand}</span>}
             {item.price && <span>€{item.price.toFixed(2)}</span>}
             <Badge
-              variant={item.shared ? "default" : "outline"}
+              variant={item.shared ? (isOwner ? "default" : "secondary") : "outline"}
               className="text-xs"
             >
-              {item.shared ? "Shared" : "Personal"}
+              {item.shared
+                ? isOwner
+                  ? "Shared"
+                  : "Shared by flatmate"
+                : "Personal"}
             </Badge>
           </div>
 

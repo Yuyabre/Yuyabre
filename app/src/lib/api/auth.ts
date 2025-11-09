@@ -127,6 +127,36 @@ export const authApi = {
 
   getHousehold: (householdId: string) =>
     request<Household>(`/auth/households/${encodeURIComponent(householdId)}`),
+
+  // Splitwise OAuth methods
+  getSplitwiseAuthorizeUrl: (userId: string, callbackUrl: string) => {
+    const params = new URLSearchParams({
+      user_id: userId,
+      callback_url: callbackUrl,
+    });
+    return request<{ authorize_url: string }>(
+      `/auth/splitwise/authorize?${params.toString()}`
+    );
+  },
+
+  checkSplitwiseStatus: (userId: string) =>
+    request<{ user_id: string; authorized: boolean }>(
+      `/auth/splitwise/status/${encodeURIComponent(userId)}`
+    ),
+
+  handleSplitwiseCallback: (
+    userId: string,
+    oauthToken: string,
+    oauthVerifier: string
+  ) =>
+    request<{ success: boolean; message: string }>("/auth/splitwise", {
+      method: "POST",
+      body: {
+        user_id: userId,
+        oauth_token: oauthToken,
+        oauth_verifier: oauthVerifier,
+      },
+    }),
 };
 
 export type { ApiError };

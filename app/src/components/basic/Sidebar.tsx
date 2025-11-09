@@ -60,6 +60,8 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   setExpensesOpen: (open: boolean) => void;
   householdOpen: boolean;
   setHouseholdOpen: (open: boolean) => void;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export function AppSidebar({
@@ -71,6 +73,8 @@ export function AppSidebar({
   setExpensesOpen,
   householdOpen,
   setHouseholdOpen,
+  settingsOpen,
+  setSettingsOpen,
   ...props
 }: AppSidebarProps) {
   const { currentHousehold } = useStore();
@@ -228,7 +232,10 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Settings">
+              <SidebarMenuButton
+                tooltip="Settings"
+                onClick={() => setSettingsOpen(true)}
+              >
                 <IconSettings className="size-4" />
                 <span>Settings</span>
               </SidebarMenuButton>

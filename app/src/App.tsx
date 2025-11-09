@@ -11,6 +11,8 @@ import { ExpensesModal } from "./components/modals/ExpensesModal";
 import { OrdersModal } from "./components/modals/OrdersModal";
 import { HouseholdModal } from "./components/modals/HouseholdModal";
 import { HouseholdOnboardingModal } from "./components/modals/HouseholdOnboardingModal";
+import { SplitwiseOnboardingModal } from "./components/modals/SplitwiseOnboardingModal";
+import { SettingsModal } from "./components/modals/SettingsModal";
 import { Header } from "./components/basic/Header";
 import { AuthScreen } from "./components/layouts/Auth/AuthScreen";
 import { useStore } from "./store/useStore";
@@ -22,8 +24,11 @@ function App() {
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [expensesOpen, setExpensesOpen] = useState(false);
   const [householdOpen, setHouseholdOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [hasPromptedHousehold, setHasPromptedHousehold] = useState(false);
+  const [hasPromptedSplitwise, setHasPromptedSplitwise] = useState(false);
+  const [splitwiseCompleted, setSplitwiseCompleted] = useState(false);
   const { currentUser, setCurrentUser, setCurrentHousehold } = useStore();
 
   // Fetch latest user info when we have a user_id
@@ -32,9 +37,8 @@ function App() {
   );
 
   // Fetch household when user has household_id
-  const { data: fetchedHousehold, isLoading: isLoadingHousehold } = useGetHousehold(
-    currentUser?.household_id ?? null
-  );
+  const { data: fetchedHousehold, isLoading: isLoadingHousehold } =
+    useGetHousehold(currentUser?.household_id ?? null);
 
   useEffect(() => {
     const storedUser = authStorage.loadUser();
@@ -67,13 +71,32 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       setHasPromptedHousehold(false);
+      setHasPromptedSplitwise(false);
+      setSplitwiseCompleted(false);
       return;
     }
 
-    // Only show onboarding modal if user has no household_id
-    // Don't show if household is still loading
+    // Check if we should show Splitwise onboarding
+    // Show Splitwise modal first if user just signed up and hasn't completed it
+    if (
+      !hasPromptedSplitwise &&
+      !splitwiseCompleted &&
+      !isLoadingUser &&
+      !isLoadingHousehold
+    ) {
+      // Check if user just signed up (no household_id is a good indicator)
+      // We'll show Splitwise modal first
+      setHasPromptedSplitwise(true);
+    }
+
+    // Only show household onboarding modal if:
+    // 1. User has no household_id
+    // 2. Splitwise onboarding is completed (or skipped)
+    // 3. Not already prompted
+    // 4. Not loading
     if (
       !currentUser.household_id &&
+      splitwiseCompleted &&
       !hasPromptedHousehold &&
       !isLoadingUser &&
       !isLoadingHousehold
@@ -86,6 +109,8 @@ function App() {
   }, [
     currentUser,
     hasPromptedHousehold,
+    hasPromptedSplitwise,
+    splitwiseCompleted,
     isLoadingHousehold,
     isLoadingUser,
   ]);
@@ -106,7 +131,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="yuyabre-theme">
       <WebSocketProvider>
-        <SidebarProvider>
+        <SidebarProvider className="overflow-hidden">
           <AppSidebar
             inventoryOpen={inventoryOpen}
             setInventoryOpen={setInventoryOpen}
@@ -116,6 +141,8 @@ function App() {
             setExpensesOpen={setExpensesOpen}
             householdOpen={householdOpen}
             setHouseholdOpen={setHouseholdOpen}
+            settingsOpen={settingsOpen}
+            setSettingsOpen={setSettingsOpen}
           />
           <SidebarInset>
             <div className="flex flex-1 flex-col gap-4 p-4">
@@ -129,8 +156,26 @@ function App() {
         <OrdersModal open={ordersOpen} onOpenChange={setOrdersOpen} />
         <ExpensesModal open={expensesOpen} onOpenChange={setExpensesOpen} />
         <HouseholdModal open={householdOpen} onOpenChange={setHouseholdOpen} />
-        {currentUser && !currentUser.household_id && !isLoadingUser && (
-          <HouseholdOnboardingModal open={hasPromptedHousehold} />
+        <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+        {currentUser && !isLoadingUser && (
+          <>
+            <SplitwiseOnboardingModal
+              open={hasPromptedSplitwise && !splitwiseCompleted}
+              onComplete={() => {
+                setSplitwiseCompleted(true);
+                setHasPromptedSplitwise(false);
+              }}
+              onSkip={() => {
+                setSplitwiseCompleted(true);
+                setHasPromptedSplitwise(false);
+              }}
+            />
+            {splitwiseCompleted &&
+              !currentUser.household_id &&
+              !isLoadingHousehold && (
+                <HouseholdOnboardingModal open={hasPromptedHousehold} />
+              )}
+          </>
         )}
       </WebSocketProvider>
     </ThemeProvider>

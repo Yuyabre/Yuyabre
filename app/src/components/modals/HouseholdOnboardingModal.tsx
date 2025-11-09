@@ -374,7 +374,11 @@ export function HouseholdOnboardingModal({
 
   return (
     <Dialog open={open} modal={true}>
-      <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        hideCloseButton={true}
+      >
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {mode === "choose"

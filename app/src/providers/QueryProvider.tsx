@@ -5,8 +5,12 @@ import type { ReactNode } from 'react';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
+      staleTime: 0,
+      cacheTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchOnMount: true,
     },
   },
 });
@@ -19,7 +23,12 @@ export function QueryProvider({ children }: QueryProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools initialIsOpen={false} />
+      <div className="rq-devtools-container">
+        <ReactQueryDevtools
+          initialIsOpen={false}
+          toggleButtonProps={{ className: "rq-toggle-button" }}
+        />
+      </div>
     </QueryClientProvider>
   );
 }

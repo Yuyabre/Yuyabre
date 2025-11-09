@@ -176,7 +176,7 @@ export function InventoryModal({ open, onOpenChange, userId, userName }: Invento
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="h-8 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+              className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
             >
               <option value="">All Categories</option>
               {categories.map((cat) => (

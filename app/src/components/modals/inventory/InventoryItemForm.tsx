@@ -144,7 +144,7 @@ export function InventoryItemForm({
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
             required
           >
             <option value="">Select category</option>
@@ -190,7 +190,7 @@ export function InventoryItemForm({
             id="unit"
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
             required
           >
             <option value="">Select unit</option>
