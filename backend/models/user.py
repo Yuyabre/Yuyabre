@@ -87,6 +87,11 @@ class User(Document):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     splitwise_user_id: Optional[str] = None
+    # OAuth tokens for Splitwise
+    splitwise_access_token: Optional[str] = None
+    splitwise_access_token_secret: Optional[str] = None
+    splitwise_oauth_token: Optional[str] = None  # Temporary token during OAuth flow
+    splitwise_oauth_token_secret: Optional[str] = None  # Temporary secret during OAuth flow
     preferences: UserPreference = Field(default_factory=UserPreference)
     consumption_patterns: Dict[str, ConsumptionPattern] = Field(default_factory=dict)
     is_active: bool = Field(default=True)

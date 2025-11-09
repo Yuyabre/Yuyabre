@@ -12,6 +12,7 @@ from modules.inventory import InventoryService
 from modules.splitwise import SplitwiseService
 from modules.ordering import OrderingService
 from models.order import OrderStatus
+from models.user import User
 
 
 class GroceryAgent:
@@ -175,18 +176,52 @@ class GroceryAgent:
                     inventory_item.item_id, item.quantity
                 )
 
-        # Create Splitwise expense
-        if self.splitwise_service.is_configured():
-            expense_id = await self.splitwise_service.create_expense(
-                description=f"Grocery Order - {order.service}",
-                amount=order.total,
-                user_ids=["123"],  # TODO: Get actual user IDs from flatmates
-                notes=f"Order ID: {order.order_id}",
-            )
-
-            if expense_id:
-                order.splitwise_expense_id = expense_id
-                await order.save()
+        # # Create Splitwise expense using direct API calls
+        # if self.splitwise_service.is_configured() and user_id:
+        #     # Check if user is authorized
+        #     if await self.splitwise_service.is_user_authorized(user_id):
+        #         # TODO: Get actual Splitwise user IDs from flatmates
+        #         # For now, we'll need the user's own Splitwise user ID
+        #         user = await User.find_one(User.user_id == user_id)
+        #         if user and user.splitwise_user_id and user.splitwise_access_token:
+        #             try:
+        #                 import requests
+        #                 from requests_oauthlib import OAuth1
+                        
+        #                 # Create OAuth session
+        #                 session = requests.Session()
+        #                 session.auth = OAuth1(
+        #                     self.splitwise_service.consumer_key,
+        #                     client_secret=self.splitwise_service.consumer_secret,
+        #                     resource_owner_key=user.splitwise_access_token,
+        #                     resource_owner_secret=user.splitwise_access_token_secret
+        #                 )
+                        
+        #                 # Build expense data
+        #                 expense_data = {
+        #                     "cost": str(round(order.total, 2)),
+        #                     "description": f"Grocery Order - {order.service}",
+        #                     "currency_code": "EUR",
+        #                     "users[0][user_id]": str(int(user.splitwise_user_id)),
+        #                     "users[0][paid_share]": str(round(order.total, 2)),
+        #                     "users[0][owed_share]": str(round(order.total, 2)),
+        #                 }
+                        
+        #                 # Make API call
+        #                 response = session.post(
+        #                     'https://secure.splitwise.com/api/v3.0/create_expense',
+        #                     data=expense_data,
+        #                     headers={'Content-Type': 'application/x-www-form-urlencoded'}
+        #                 )
+                        
+        #                 if response.status_code == 200:
+        #                     result = response.json()
+        #                     if 'expenses' in result and len(result['expenses']) > 0:
+        #                         expense_id = str(result['expenses'][0]['id'])
+        #                         order.splitwise_expense_id = expense_id
+        #                         await order.save()
+        #             except Exception as e:
+        #                 logger.warning(f"Failed to create Splitwise expense: {e}")
 
         return (
             f"✓ Order placed successfully!\n"

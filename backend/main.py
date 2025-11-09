@@ -15,7 +15,7 @@ from agent.core import GroceryAgent
 from modules.inventory import InventoryService
 from modules.ordering import OrderingService
 from modules.splitwise import SplitwiseService
-from models import InventoryItem, Order
+from models import InventoryItem, Order, User
 from config import settings
 
 
@@ -232,11 +232,20 @@ async def cancel_order(order_id: str):
     return {"message": "Order cancelled successfully"}
 
 
-# Splitwise endpoints
-@app.get("/splitwise/expenses", tags=["Splitwise"])
-async def get_splitwise_expenses(limit: int = 20):
+# Splitwise OAuth endpoints
+@app.get("/api/auth/splitwise/authorize", tags=["Splitwise OAuth"])
+async def splitwise_authorize(user_id: str):
     """
-    Get recent Splitwise expenses.
+    Initiate OAuth authorization flow for Splitwise.
+    
+    This endpoint generates an authorization URL that the user should visit
+    to authorize the application to access their Splitwise account.
+    
+    Args:
+        user_id: Internal user ID
+        
+    Returns:
+        JSON with authorization URL
     """
     if not splitwise_service.is_configured():
         raise HTTPException(
@@ -244,7 +253,130 @@ async def get_splitwise_expenses(limit: int = 20):
             detail="Splitwise not configured"
         )
     
-    expenses = await splitwise_service.get_group_expenses(limit=limit)
+    authorize_url = await splitwise_service.get_authorize_url(user_id)
+    
+    if not authorize_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate authorization URL"
+        )
+    
+    return {
+        "authorize_url": authorize_url
+    }
+
+
+@app.get("/api/auth/splitwise/callback", tags=["Splitwise OAuth"])
+async def splitwise_callback(
+    oauth_token: str,
+    oauth_verifier: str,
+    user_id: Optional[str] = None
+):
+    """
+    Handle OAuth callback from Splitwise.
+    
+    This endpoint receives the OAuth callback after the user authorizes
+    the application. It exchanges the request token for an access token
+    and stores it for the user.
+    
+    Args:
+        oauth_token: OAuth token from callback
+        oauth_verifier: OAuth verifier from callback
+        user_id: Internal user ID (optional, can be retrieved from token)
+        
+    Returns:
+        Success message
+    """
+    if not splitwise_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Splitwise not configured"
+        )
+    
+    # If user_id not provided, try to find user by oauth_token
+    if not user_id:
+        user = await User.find_one(User.splitwise_oauth_token == oauth_token)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not identify user. Please provide user_id or ensure OAuth flow was initiated."
+            )
+        user_id = user.user_id
+    
+    success = await splitwise_service.handle_oauth_callback(
+        user_id=user_id,
+        oauth_token=oauth_token,
+        oauth_verifier=oauth_verifier
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to complete authorization"
+        )
+    
+    return {
+        "success": True,
+        "message": "Successfully authorized Splitwise. You can now use Splitwise features."
+    }
+
+
+@app.get("/api/auth/splitwise/status/{user_id}", tags=["Splitwise OAuth"])
+async def splitwise_auth_status(user_id: str):
+    """
+    Check if a user has authorized Splitwise.
+    
+    Args:
+        user_id: Internal user ID
+        
+    Returns:
+        Authorization status
+    """
+    is_authorized = await splitwise_service.is_user_authorized(user_id)
+    
+    return {
+        "user_id": user_id,
+        "authorized": is_authorized
+    }
+
+
+# Splitwise endpoints
+@app.get("/splitwise/expenses", tags=["Splitwise"])
+async def get_splitwise_expenses(user_id: str, limit: int = 20):
+    """
+    Get recent Splitwise expenses for a user.
+    
+    Args:
+        user_id: Internal user ID (must be authorized)
+        limit: Maximum number of expenses to retrieve
+    """
+    if not splitwise_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Splitwise not configured"
+        )
+    
+    if not await splitwise_service.is_user_authorized(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not authorized with Splitwise. Please complete OAuth flow first."
+        )
+    
+    # Get user and convert to dict format for JSON-compatible method
+    user = await User.find_one(User.user_id == user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User not found: {user_id}"
+        )
+    
+    # Convert User object to dict format
+    user_data = {
+        'splitwise_access_token': user.splitwise_access_token,
+        'splitwise_access_token_secret': user.splitwise_access_token_secret,
+    }
+    
+    expenses = await splitwise_service.get_group_expenses_json(user_data, limit=limit)
     return {"expenses": expenses}
 
 

@@ -49,9 +49,16 @@ class Settings(BaseSettings):
 
     # Splitwise
     splitwise_api_key: Optional[str] = None
-    splitwise_consumer_key: Optional[str] = None
-    splitwise_consumer_secret: Optional[str] = None
+    splitwise_consumer_key: Optional[str] = Field(
+        default="AugRJE1hcpm26YGy9lsESLzkjTzZjz4C8bFyJfmy"
+    )
+    splitwise_consumer_secret: Optional[str] = Field(
+        default="ptm5HcZ03TtCVZu81nKa0NY0DtEzyckdSgfq0Nge"
+    )
     splitwise_group_id: Optional[str] = None
+    splitwise_callback_url: str = Field(
+        default="http://localhost:8000/api/auth/splitwise/callback"
+    )
 
     # Thuisbezorgd
     thuisbezorgd_email: Optional[str] = None
