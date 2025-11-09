@@ -244,3 +244,95 @@ class SplitwiseService:
             logger.error(f"Failed to get group expenses: {e}")
             return []
 
+    def _get_user_client(
+        self,
+        access_token: str,
+        access_token_secret: str
+    ) -> Optional[Splitwise]:
+        """
+        Create a Splitwise client for a specific user using their OAuth tokens.
+        
+        Args:
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            
+        Returns:
+            Splitwise client instance or None if not configured
+        """
+        if not settings.splitwise_consumer_key or not settings.splitwise_consumer_secret:
+            logger.error("Splitwise credentials not configured")
+            return None
+        
+        try:
+            client = Splitwise(
+                settings.splitwise_consumer_key,
+                settings.splitwise_consumer_secret,
+                api_key=access_token,
+                api_secret=access_token_secret
+            )
+            return client
+        except Exception as e:
+            logger.error(f"Failed to create user Splitwise client: {e}")
+            return None
+    
+    async def get_user_expenses(
+        self,
+        user_id: str,
+        access_token: str,
+        access_token_secret: str,
+        group_id: Optional[str] = None,
+        limit: int = 20
+    ) -> List[Dict]:
+        """
+        Get recent expenses for a user using their OAuth tokens.
+        
+        Args:
+            user_id: Internal user ID
+            access_token: User's OAuth access token
+            access_token_secret: User's OAuth access token secret
+            group_id: Splitwise group ID (uses default from settings if not provided)
+            limit: Maximum number of expenses to retrieve
+            
+        Returns:
+            List of expense dictionaries
+        """
+        client = self._get_user_client(access_token, access_token_secret)
+        if not client:
+            logger.error(f"Failed to create client for user {user_id}")
+            return []
+        
+        try:
+            # Get expenses - if group_id is provided, filter by group, otherwise get all
+            if group_id:
+                expenses = client.getExpenses(
+                    group_id=int(group_id),
+                    limit=limit
+                )
+            else:
+                # Get all expenses (across all groups)
+                expenses = client.getExpenses(limit=limit)
+            
+            return [
+                {
+                    "id": str(exp.getId()),
+                    "description": exp.getDescription(),
+                    "cost": str(exp.getCost()),
+                    "currency_code": exp.getCurrencyCode() if hasattr(exp, 'getCurrencyCode') else "EUR",
+                    "date": exp.getDate().isoformat() if exp.getDate() else None,
+                    "category": exp.getCategory().getName() if exp.getCategory() else None,
+                    "users": [
+                        {
+                            "id": str(u.getId()),
+                            "owed_share": str(u.getOwedShare()),
+                            "paid_share": str(u.getPaidShare()),
+                        }
+                        for u in exp.getUsers()
+                    ] if exp.getUsers() else [],
+                }
+                for exp in expenses
+            ]
+            
+        except Exception as e:
+            logger.error(f"Failed to get user expenses for {user_id}: {e}")
+            return []
+

@@ -11,6 +11,8 @@ from api.serializers import (
     JoinHouseholdRequest,
     CreateHouseholdRequest,
     HouseholdResponse,
+    UpdateUserPreferencesRequest,
+    UpdatePreferencesResponse,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -88,4 +90,28 @@ async def join_household_endpoint(
     **Note**: A user can only belong to one household at a time.
     """
     return await controller.join_household(user_id, request)
+
+
+@router.patch("/users/{user_id}/preferences", response_model=UpdatePreferencesResponse)
+async def update_user_preferences_endpoint(
+    user_id: str,
+    request: UpdateUserPreferencesRequest,
+):
+    """
+    Update a user's dietary preferences, allergies, favorite brands, or disliked items.
+    
+    This endpoint supports both adding and removing preferences:
+    - Use `dietary_restrictions`, `allergies`, `favorite_brands`, `disliked_items` to ADD items
+    - Use `remove_dietary_restrictions`, `remove_allergies`, `remove_favorite_brands`, `remove_disliked_items` to REMOVE items
+    
+    **Examples**:
+    - Add allergy: `{"allergies": ["peanuts"]}`
+    - Remove allergy: `{"remove_allergies": ["peanuts"]}`
+    - Add dietary restriction: `{"dietary_restrictions": ["vegetarian"]}`
+    - Add favorite brand: `{"favorite_brands": ["Melkunie"]}`
+    
+    **Note**: Duplicate items are automatically filtered out. Allergy names are normalized
+    (e.g., "milk" and "dairy" are treated as the same).
+    """
+    return await controller.update_user_preferences(user_id, request)
 

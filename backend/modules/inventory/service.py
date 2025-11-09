@@ -227,7 +227,8 @@ class InventoryService:
         
         If user_id is provided, returns:
         - All personal items for that user (shared=False, user_id=user_id)
-        - All shared items for that user's household (shared=True, household_id=household_id)
+        - ALL shared items from that user's household (shared=True, household_id=household_id)
+          This includes items shared by ALL household members, not just the requesting user.
         
         If household_id is provided, returns:
         - All shared items for that household (shared=True, household_id=household_id)
@@ -239,7 +240,7 @@ class InventoryService:
             household_id: Household ID to get shared items for
             
         Returns:
-            List of InventoryItems
+            List of InventoryItems (personal items + all shared household items)
         """
         from models.user import User
         from models.household import Household
@@ -251,14 +252,15 @@ class InventoryService:
             user = await User.find_one(User.user_id == user_id)
             user_household_id = getattr(user, 'household_id', None) if user else None
             
-            # Get personal items
+            # Get personal items owned by this user
             personal_items = await InventoryItem.find(
                 InventoryItem.user_id == user_id,
                 InventoryItem.shared == False
             ).to_list()
             items.extend(personal_items)
             
-            # Get shared items from user's household
+            # Get ALL shared items from user's household (including items shared by other household members)
+            # This returns all items where shared=True and household_id matches, regardless of who created them
             if user_household_id:
                 shared_items = await InventoryItem.find(
                     InventoryItem.household_id == user_household_id,

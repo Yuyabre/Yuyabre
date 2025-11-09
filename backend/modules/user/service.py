@@ -22,6 +22,7 @@ class UserService:
         password: str,
         phone: Optional[str] = None,
         splitwise_user_id: Optional[str] = None,
+        discord_user_id: Optional[str] = None,
         preferences: Optional[UserPreference] = None,
     ) -> User:
         """
@@ -33,6 +34,7 @@ class UserService:
             password: Plain text password (will be hashed)
             phone: User's phone number (optional)
             splitwise_user_id: User's Splitwise ID (optional)
+            discord_user_id: User's Discord user ID (optional, for Discord integration)
             preferences: User dietary preferences (optional)
             
         Returns:
@@ -60,6 +62,7 @@ class UserService:
             phone=phone,
             password_hash=password_hash,
             splitwise_user_id=splitwise_user_id,
+            discord_user_id=discord_user_id,
             preferences=user_preferences,
         )
         
@@ -164,6 +167,7 @@ class UserService:
         country: Optional[str] = None,
         whatsapp_group_id: Optional[str] = None,
         whatsapp_group_name: Optional[str] = None,
+        discord_channel_id: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> Household:
         """
@@ -178,6 +182,7 @@ class UserService:
             country: Country (optional)
             whatsapp_group_id: WhatsApp group ID or phone number (optional)
             whatsapp_group_name: WhatsApp group name (optional)
+            discord_channel_id: Discord channel ID for household notifications (optional)
             notes: Additional notes (optional)
             
         Returns:
@@ -204,6 +209,7 @@ class UserService:
             country=country,
             whatsapp_group_id=whatsapp_group_id,
             whatsapp_group_name=whatsapp_group_name,
+            discord_channel_id=discord_channel_id,
             notes=notes,
         )
         

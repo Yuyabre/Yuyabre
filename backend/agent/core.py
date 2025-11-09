@@ -45,11 +45,21 @@ class GroceryAgent:
         self.tool_specs = build_tool_specs()
         
         # Initialize tool handlers
+        # Use shared Discord service instance if available, otherwise create new one
+        try:
+            from api.dependencies import discord_service as shared_discord_service
+            discord_service = shared_discord_service
+        except ImportError:
+            # Fallback if dependencies not available (e.g., in CLI)
+            from modules.discord import DiscordService
+            discord_service = DiscordService()
+        
         self.tool_handlers_obj = ToolHandlers(
             inventory_service=self.inventory_service,
             ordering_service=self.ordering_service,
             splitwise_service=self.splitwise_service,
             whatsapp_service=self.whatsapp_service,
+            discord_service=discord_service,
             update_system_prompt_callback=self._update_system_prompt_for_user,
         )
         
@@ -64,6 +74,8 @@ class GroceryAgent:
             "get_user_info": self.tool_handlers_obj.get_user_info,
             "update_inventory_item": self.tool_handlers_obj.update_inventory_item,
             "send_whatsapp_message": self.tool_handlers_obj.send_whatsapp_message,
+            "get_housemates": self.tool_handlers_obj.get_housemates,
+            "send_discord_message": self.tool_handlers_obj.send_discord_message,
         }
 
         # Initialize conversation manager

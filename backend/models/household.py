@@ -38,6 +38,7 @@ class Household(Document):
     country: Optional[str] = None
     whatsapp_group_id: Optional[str] = None  # Group ID or phone number
     whatsapp_group_name: Optional[str] = None
+    discord_channel_id: Optional[str] = None  # Discord channel ID for household notifications
     member_ids: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = Field(default=True)
@@ -48,6 +49,7 @@ class Household(Document):
         indexes = [
             "household_id",
             "whatsapp_group_id",
+            "discord_channel_id",
             "invite_code",
         ]
     

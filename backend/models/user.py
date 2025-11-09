@@ -90,6 +90,9 @@ class User(Document):
     password_hash: Optional[str] = None  # Hashed password for authentication
     household_id: Optional[str] = None
     splitwise_user_id: Optional[str] = None
+    splitwise_access_token: Optional[str] = None  # OAuth 1.0 access token
+    splitwise_access_token_secret: Optional[str] = None  # OAuth 1.0 access token secret
+    discord_user_id: Optional[str] = None  # Discord user ID for message matching
     preferences: UserPreference = Field(default_factory=UserPreference)
     consumption_patterns: Dict[str, ConsumptionPattern] = Field(default_factory=dict)
     is_active: bool = Field(default=True)
@@ -103,6 +106,7 @@ class User(Document):
             "email",
             "household_id",
             "splitwise_user_id",
+            "discord_user_id",
         ]
     
     def add_consumption_pattern(self, pattern: ConsumptionPattern) -> None:

@@ -10,6 +10,7 @@ An intelligent AI agent system for automating grocery management in shared livin
 - [Project Structure](#project-structure)
 - [Setup & Installation](#setup--installation)
 - [Configuration](#configuration)
+- [Required Credentials](#required-credentials)
 - [Usage](#usage)
 - [API Documentation](#api-documentation)
 - [Development](#development)
@@ -131,9 +132,12 @@ backend/
 ### Prerequisites
 
 - Python 3.11+
-- MongoDB 7.0+
+- MongoDB 7.0+ (local or Atlas cloud)
 - OpenAI API key
+- (Optional) Discord Bot Token or WhatsApp (Twilio) credentials
 - (Optional) Docker & Docker Compose
+
+**📖 See [SETUP.md](./SETUP.md) for complete credential setup guide**
 
 ### Local Installation
 
@@ -169,6 +173,7 @@ docker run -d -p 27017:27017 --name mongodb mongo:7.0
 ```bash
 cp .env.example .env
 # Edit .env with your API keys and configuration
+# See SETUP.md for detailed credential instructions
 ```
 
 6. **Create logs directory**
@@ -199,39 +204,47 @@ This starts:
 
 ## ⚙️ Configuration
 
-Create a `.env` file in the backend directory:
+**📖 For detailed setup instructions and credential requirements, see [SETUP.md](./SETUP.md)**
+
+### Quick Configuration
+
+Create a `.env` file in the backend directory with your credentials:
 
 ```env
-# MongoDB
+# Required
+OPENAI_API_KEY=your_openai_api_key_here
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DB_NAME=grocery_agent
 
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-5-nano
-OPENAI_PROXY_URL=https://fj7qg3jbr3.execute-api.eu-west-1.amazonaws.com/v1
+# Messaging (choose Discord or WhatsApp)
+DISCORD_BOT_TOKEN=your_discord_bot_token
+# OR
+WHATSAPP_ACCOUNT_SID=your_twilio_account_sid
+WHATSAPP_AUTH_TOKEN=your_twilio_auth_token
+WHATSAPP_FROM_NUMBER=whatsapp:+1234567890
 
-# Splitwise API
+# Optional
 SPLITWISE_API_KEY=your_splitwise_api_key
 SPLITWISE_CONSUMER_KEY=your_consumer_key
 SPLITWISE_CONSUMER_SECRET=your_consumer_secret
 SPLITWISE_GROUP_ID=your_group_id
-
-# Thuisbezorgd
-THUISBEZORGD_EMAIL=your_email
-THUISBEZORGD_PASSWORD=your_password
-
-# Application
-APP_ENV=development
-APP_DEBUG=True
-LOG_LEVEL=INFO
 ```
 
 ### Getting API Keys
 
+See **[SETUP.md](./SETUP.md)** for detailed instructions on:
+- ✅ OpenAI API setup
+- ✅ MongoDB configuration (local or Atlas)
+- ✅ Discord bot creation and setup
+- ✅ WhatsApp/Twilio configuration
+- ✅ Splitwise integration
+- ✅ Step-by-step verification
+
+**Quick Links**:
 - **OpenAI**: https://platform.openai.com/api-keys
-- **Splitwise**: https://secure.splitwise.com/apps/new
-- **Thuisbezorgd**: Use your account credentials
+- **Discord Developer Portal**: https://discord.com/developers/applications
+- **Twilio Console**: https://console.twilio.com/
+- **Splitwise Apps**: https://secure.splitwise.com/apps/new
 
 ## 💻 Usage
 
@@ -431,7 +444,8 @@ gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 
 - [ ] Complete Thuisbezorgd integration (API or web scraping)
 - [ ] Implement actual order placement logic
-- [ ] Add WhatsApp notifications module
+- [x] Add Discord messaging integration
+- [x] Add WhatsApp notifications module
 - [ ] User authentication and authorization
 - [ ] Better error handling and retry logic
 

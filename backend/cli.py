@@ -42,6 +42,8 @@ class GroceryCLI:
         self.current_household: Optional[Household] = None
         self.api_base_url = "http://localhost:8000"
         self.processed_orders: set[str] = set()  # Track orders we've already processed
+        self.last_message_count: dict[str, int] = {}  # Track last message count per user
+        self.displayed_messages: dict[str, set[str]] = {}  # Track displayed messages per user
     
     async def start(self):
         """Start the CLI interface."""
@@ -140,6 +142,41 @@ Your intelligent assistant for shared flat grocery management.
                     self.current_user = user
                     console.print(f"[green]✓ Welcome back, {user.name}![/green]")
                     
+                    # Check if Discord user ID is missing
+                    if not self.current_user.discord_user_id:
+                        console.print("\n[bold yellow]Discord Integration[/bold yellow]")
+                        
+                        # Check if Discord bot token is configured
+                        discord_configured = bool(settings.discord_bot_token)
+                        if not discord_configured:
+                            console.print("[red]⚠ Warning: Discord bot token not configured in environment variables.[/red]")
+                            console.print("[dim]Discord features will not work until DISCORD_BOT_TOKEN is set.[/dim]\n")
+                        else:
+                            console.print("[green]✓ Discord bot token is configured[/green]\n")
+                        
+                        console.print("Your Discord user ID is not set.")
+                        console.print("This is needed for the bot to identify you when you respond to group orders.\n")
+                        setup_discord = Confirm.ask(
+                            "Would you like to add your Discord user ID now? (Recommended for group orders)",
+                            default=True
+                        )
+                        if setup_discord:
+                            console.print("\n[cyan]How to find your Discord user ID:[/cyan]")
+                            console.print("  1. Open Discord → User Settings → Advanced")
+                            console.print("  2. Enable 'Developer Mode'")
+                            console.print("  3. Right-click your name (in any server or DM)")
+                            console.print("  4. Click 'Copy ID'\n")
+                            
+                            discord_user_id = Prompt.ask("Enter your Discord user ID", default="")
+                            if discord_user_id:
+                                self.current_user.discord_user_id = discord_user_id
+                                await self.current_user.save()
+                                console.print("[green]✓ Discord user ID saved![/green]")
+                                
+                                if not discord_configured:
+                                    console.print("[yellow]⚠ Note: User ID saved, but Discord bot token is not configured.[/yellow]")
+                                    console.print("[yellow]   Discord features will not work until DISCORD_BOT_TOKEN is set.[/yellow]\n")
+                    
                     # Ask if they want to update preferences
                     update_prefs = Confirm.ask(
                         "\nDo you want to update your preferences?",
@@ -174,12 +211,39 @@ Your intelligent assistant for shared flat grocery management.
         phone = Prompt.ask("Enter your phone number (optional, for WhatsApp)", default="")
         splitwise_id = Prompt.ask("Enter your Splitwise user ID (optional)", default="")
         
+        # Discord user ID
+        console.print("\n[bold yellow]Discord Integration[/bold yellow]")
+        
+        # Check if Discord bot token is configured
+        discord_configured = bool(settings.discord_bot_token)
+        if not discord_configured:
+            console.print("[red]⚠ Warning: Discord bot token not configured in environment variables.[/red]")
+            console.print("[dim]To enable Discord integration, set DISCORD_BOT_TOKEN in your .env file.[/dim]")
+            console.print("[dim]See SETUP.md for instructions on creating a Discord bot.[/dim]\n")
+        else:
+            console.print("[green]✓ Discord bot token is configured[/green]\n")
+        
+        console.print("To receive and respond to group orders via Discord, you need to provide your Discord user ID.")
+        console.print("This allows the bot to identify you when you click buttons or send messages.\n")
+        console.print("[cyan]How to find your Discord user ID:[/cyan]")
+        console.print("  1. Open Discord → User Settings → Advanced")
+        console.print("  2. Enable 'Developer Mode'")
+        console.print("  3. Right-click your name (in any server or DM)")
+        console.print("  4. Click 'Copy ID'\n")
+        
+        discord_user_id = Prompt.ask("Enter your Discord user ID (recommended if using Discord)", default="")
+        
+        if discord_user_id and not discord_configured:
+            console.print("[yellow]⚠ Note: You've entered a Discord user ID, but Discord bot token is not configured.[/yellow]")
+            console.print("[yellow]   Discord features will not work until DISCORD_BOT_TOKEN is set.[/yellow]\n")
+        
         # Create user
         user = User(
             name=name,
             email=email if email else None,
             phone=phone if phone else None,
             splitwise_user_id=splitwise_id if splitwise_id else None,
+            discord_user_id=discord_user_id if discord_user_id else None,
         )
         
         # Collect preferences
@@ -312,6 +376,39 @@ Your intelligent assistant for shared flat grocery management.
                 if household:
                     # Add user to household
                     household.add_member(self.current_user.user_id)
+                    
+                    # Check if household needs Discord channel configured
+                    if not household.discord_channel_id:
+                        console.print("\n[bold yellow]Discord Channel Setup[/bold yellow]")
+                        
+                        # Check if Discord bot token is configured
+                        discord_configured = bool(settings.discord_bot_token)
+                        if not discord_configured:
+                            console.print("[red]⚠ Warning: Discord bot token not configured in environment variables.[/red]")
+                            console.print("[dim]Discord features will not work until DISCORD_BOT_TOKEN is set.[/dim]\n")
+                        else:
+                            console.print("[green]✓ Discord bot token is configured[/green]\n")
+                        
+                        console.print("This household doesn't have a Discord channel configured.")
+                        console.print("The bot will send group order notifications to this channel.\n")
+                        setup_discord = Confirm.ask("Would you like to configure a Discord channel now?", default=True)
+                        
+                        if setup_discord:
+                            console.print("\n[cyan]How to find your Discord channel ID:[/cyan]")
+                            console.print("  1. Open Discord → User Settings → Advanced")
+                            console.print("  2. Enable 'Developer Mode'")
+                            console.print("  3. Right-click on the Discord channel (in your server)")
+                            console.print("  4. Click 'Copy ID'\n")
+                            
+                            discord_channel_id = Prompt.ask("Enter Discord channel ID", default="")
+                            if discord_channel_id:
+                                household.discord_channel_id = discord_channel_id
+                                console.print("[green]✓ Discord channel configured[/green]")
+                                
+                                if not discord_configured:
+                                    console.print("[yellow]⚠ Note: Channel ID saved, but Discord bot token is not configured.[/yellow]")
+                                    console.print("[yellow]   The bot will not be able to send messages until DISCORD_BOT_TOKEN is set.[/yellow]\n")
+                    
                     await household.save()
                     
                     # Update user's household_id
@@ -332,10 +429,57 @@ Your intelligent assistant for shared flat grocery management.
     async def _create_new_household(self):
         """Create a new household."""
         name = Prompt.ask("Enter household name (e.g., 'Flat 3B')")
-        whatsapp_group_id = Prompt.ask("Enter WhatsApp group ID/phone (optional)", default="")
+        
+        # Discord channel setup
+        console.print("\n[bold yellow]Discord Channel Setup[/bold yellow]")
+        
+        # Check if Discord bot token is configured
+        discord_configured = bool(settings.discord_bot_token)
+        if not discord_configured:
+            console.print("[red]⚠ Warning: Discord bot token not configured in environment variables.[/red]")
+            console.print("[dim]Discord features will not work until DISCORD_BOT_TOKEN is set in .env file.[/dim]")
+            console.print("[dim]See SETUP.md for instructions on creating a Discord bot.[/dim]\n")
+        else:
+            console.print("[green]✓ Discord bot token is configured[/green]\n")
+        
+        console.print("Discord is the preferred messaging channel for group orders and notifications.")
+        console.print("The bot will send messages with YES/NO buttons to this channel for group orders.\n")
+        
+        has_discord = Confirm.ask("Do you have a Discord channel for this household?", default=True)
+        
+        discord_channel_id = None
+        if has_discord:
+            console.print("\n[cyan]How to find your Discord channel ID:[/cyan]")
+            console.print("  1. Open Discord → User Settings → Advanced")
+            console.print("  2. Enable 'Developer Mode'")
+            console.print("  3. Right-click on the Discord channel (in your server)")
+            console.print("  4. Click 'Copy ID'\n")
+            
+            discord_channel_id_input = Prompt.ask("Enter Discord channel ID", default="")
+            if discord_channel_id_input:
+                discord_channel_id = discord_channel_id_input
+                console.print("[green]✓ Discord channel configured[/green]")
+                
+                if not discord_configured:
+                    console.print("[yellow]⚠ Note: Channel ID saved, but Discord bot token is not configured.[/yellow]")
+                    console.print("[yellow]   The bot will not be able to send messages until DISCORD_BOT_TOKEN is set.[/yellow]\n")
+            else:
+                console.print("[yellow]⚠ No Discord channel ID provided. You can add it later.[/yellow]")
+        else:
+            console.print("[yellow]⚠ Discord not configured. You can add it later via household settings.[/yellow]")
+            if discord_configured:
+                console.print("[dim]Note: Discord bot is configured, but no channel is set for this household.[/dim]\n")
+        
+        # WhatsApp (optional fallback)
+        console.print("\n[yellow]WhatsApp Setup (Optional)[/yellow]")
+        has_whatsapp = Confirm.ask("Do you want to configure WhatsApp as a fallback?", default=False)
+        whatsapp_group_id = None
+        if has_whatsapp:
+            whatsapp_group_id = Prompt.ask("Enter WhatsApp group ID/phone (optional)", default="")
         
         household = Household(
             name=name,
+            discord_channel_id=discord_channel_id,
             whatsapp_group_id=whatsapp_group_id if whatsapp_group_id else None,
         )
         
@@ -354,6 +498,9 @@ Your intelligent assistant for shared flat grocery management.
         """Main command processing loop."""
         while self.running:
             try:
+                # Check for new WhatsApp messages before prompting for input
+                await self._check_and_display_new_messages()
+                
                 # Get user input
                 command = Prompt.ask("\n[bold cyan]You[/bold cyan]")
                 
@@ -391,63 +538,91 @@ Your intelligent assistant for shared flat grocery management.
                 logger.error(f"Error in command loop: {e}")
                 console.print(f"[red]Error: {e}[/red]")
     
+    async def _check_and_display_new_messages(self) -> None:
+        """
+        Check for new WhatsApp messages in the conversation and display them.
+        This runs before each command prompt to show messages in real-time.
+        """
+        try:
+            if not self.current_user or not self.agent:
+                return
+            
+            user_id = self.current_user.user_id
+            session_id = user_id or "anonymous"
+            
+            # Initialize tracking for this user if not exists
+            if session_id not in self.last_message_count:
+                self.last_message_count[session_id] = 0
+            if session_id not in self.displayed_messages:
+                self.displayed_messages[session_id] = set()
+            
+            # Check for new messages in conversation
+            if hasattr(self.agent, 'conversations') and session_id in self.agent.conversations:
+                conversation = self.agent.conversations[session_id]
+                current_message_count = len(conversation)
+                last_count = self.last_message_count[session_id]
+                
+                # If we have new messages, display them
+                if current_message_count > last_count:
+                    new_messages = conversation[last_count:]
+                    for msg in new_messages:
+                        # Create a unique ID for this message to avoid duplicates
+                        msg_content = msg.get('content', '')
+                        msg_id = f"{msg.get('role')}_{msg_content[:100]}"
+                        
+                        if msg_id not in self.displayed_messages[session_id]:
+                            self.displayed_messages[session_id].add(msg_id)
+                            
+                            # Display WhatsApp messages
+                            if msg.get('role') == 'user' and 'WhatsApp' in msg_content:
+                                console.print(f"\n[bold yellow]📱 WhatsApp:[/bold yellow] {msg_content}")
+                            elif msg.get('role') == 'assistant' and 'WhatsApp' in msg_content:
+                                console.print(f"\n[bold cyan]📱 System:[/bold cyan] {msg_content}")
+                    
+                    self.last_message_count[session_id] = current_message_count
+                    
+        except Exception as e:
+            logger.debug(f"Error checking for new messages: {e}")
+            # Silently fail - don't interrupt the user experience
+    
     async def _check_and_wait_for_group_order(self, response: str) -> None:
         """
-        Check if the response indicates a group order was created,
-        and wait for WhatsApp responses if so.
+        Check if a group order was created and wait for WhatsApp responses.
         
-        Only checks if the response mentions an order was placed or if a very recent
-        order was created (within the last 5 seconds).
+        Checks for any recent group orders created by this user (within the last 60 seconds)
+        and automatically enters the wait loop if one is found.
         """
         try:
             if not self.current_user:
                 return
             
-            # Only check if response indicates an order was placed
-            # Look for keywords that suggest an order was created
-            response_lower = response.lower()
-            order_keywords = [
-                "order placed",
-                "order created",
-                "order confirmed",
-                "i've placed",
-                "i've created",
-                "order id",
-                "whatsapp message has been sent",
-                "whatsapp message sent",
-            ]
-            
-            # Check if response suggests an order was placed
-            order_mentioned = any(keyword in response_lower for keyword in order_keywords)
-            
-            if not order_mentioned:
-                # No order mentioned in response, skip checking
-                return
-            
-            # Get the most recent order for this user created in the last 5 seconds
+            # Check for any recent orders created by this user in the last 60 seconds
+            # This is more reliable than keyword matching on the text response
             from datetime import timedelta
-            recent_time = datetime.utcnow() - timedelta(seconds=5)
+            recent_time = datetime.utcnow() - timedelta(seconds=60)
             
             recent_orders = await Order.find(
                 Order.created_by == self.current_user.user_id,
                 Order.timestamp >= recent_time
-            ).sort("-timestamp").limit(1).to_list()
+            ).sort("-timestamp").to_list()
             
             if not recent_orders:
                 return
             
-            order = recent_orders[0]
-            
-            # Skip if we've already processed this order
-            if order.order_id in self.processed_orders:
-                return
-            
-            # Check if it's a group order that's still pending
-            if order.is_group_order and order.status == OrderStatus.PENDING:
-                # Mark as processed
-                self.processed_orders.add(order.order_id)
-                console.print("\n[yellow]📱 Group order created! Waiting for WhatsApp responses...[/yellow]")
-                await self._wait_for_order_responses(order.order_id)
+            # Find the most recent group order that's still pending and hasn't been processed
+            for order in recent_orders:
+                if order.order_id in self.processed_orders:
+                    continue
+                
+                # Check if it's a group order that's still pending
+                if order.is_group_order and order.status == OrderStatus.PENDING:
+                    # Mark as processed
+                    self.processed_orders.add(order.order_id)
+                    console.print(f"\n[yellow]📱 Group order detected! Order ID: {order.order_id[:8]}...[/yellow]")
+                    console.print("[yellow]Waiting for WhatsApp responses (infinite loop - press Ctrl+C to exit)...[/yellow]")
+                    await self._wait_for_order_responses(order.order_id, timeout_seconds=0)  # 0 = infinite loop
+                    return  # Only process one order at a time
+                    
         except Exception as e:
             logger.debug(f"Error checking for group order: {e}")
             # Silently fail - don't interrupt the user experience
@@ -455,71 +630,115 @@ Your intelligent assistant for shared flat grocery management.
     async def _wait_for_order_responses(self, order_id: str, timeout_seconds: int = 300) -> None:
         """
         Wait for WhatsApp webhook responses to a group order.
+        Polls for new messages in the conversation and displays them in real-time.
         
         Args:
             order_id: Order ID to wait for
-            timeout_seconds: Maximum time to wait (default: 5 minutes)
+            timeout_seconds: Maximum time to wait (default: 5 minutes, 0 = infinite)
         """
         start_time = datetime.utcnow()
         poll_interval = 2  # Poll every 2 seconds
         last_status = None
+        last_message_count = 0
+        displayed_messages = set()  # Track which messages we've already displayed
         
-        with Live(self._create_status_display("Waiting for responses..."), refresh_per_second=2) as live:
-            while True:
-                try:
-                    # Poll the order status via API
-                    async with httpx.AsyncClient(timeout=5.0) as client:
-                        response = await client.get(
-                            f"{self.api_base_url}/orders/{order_id}"
-                        )
-                        
-                        if response.status_code == 200:
-                            order_data = response.json()
-                            current_status = order_data.get("status")
+        if not self.current_user:
+            return
+        
+        user_id = self.current_user.user_id
+        session_id = user_id or "anonymous"
+        
+        # Get initial conversation length
+        if hasattr(self.agent, 'conversations') and session_id in self.agent.conversations:
+            initial_conversation = self.agent.conversations[session_id]
+            last_message_count = len(initial_conversation)
+        
+        with Live(self._create_status_display("Waiting for WhatsApp responses..."), refresh_per_second=2) as live:
+            try:
+                while True:
+                    try:
+                        # Check for new messages in conversation
+                        if hasattr(self.agent, 'conversations') and session_id in self.agent.conversations:
+                            conversation = self.agent.conversations[session_id]
+                            current_message_count = len(conversation)
                             
-                            # Update display if status changed
-                            if current_status != last_status:
-                                last_status = current_status
+                            # If we have new messages, display them
+                            if current_message_count > last_message_count:
+                                new_messages = conversation[last_message_count:]
+                                for msg in new_messages:
+                                    # Create a unique ID for this message to avoid duplicates
+                                    msg_id = f"{msg.get('role')}_{msg.get('content', '')[:50]}"
+                                    if msg_id not in displayed_messages:
+                                        displayed_messages.add(msg_id)
+                                        
+                                        # Display WhatsApp messages
+                                        if msg.get('role') == 'user' and 'WhatsApp' in msg.get('content', ''):
+                                            console.print(f"\n[bold yellow]📱 WhatsApp:[/bold yellow] {msg.get('content', '')}")
+                                        elif msg.get('role') == 'assistant' and 'WhatsApp' in msg.get('content', ''):
+                                            console.print(f"\n[bold cyan]📱 System:[/bold cyan] {msg.get('content', '')}")
                                 
-                                # Check if order is finalized
-                                if current_status in [OrderStatus.CONFIRMED.value, OrderStatus.CANCELLED.value]:
+                                last_message_count = current_message_count
+                        
+                        # Poll the order status via API
+                        async with httpx.AsyncClient(timeout=5.0) as client:
+                            response = await client.get(
+                                f"{self.api_base_url}/orders/{order_id}"
+                            )
+                            
+                            if response.status_code == 200:
+                                order_data = response.json()
+                                current_status = order_data.get("status")
+                                
+                                # Update display if status changed
+                                if current_status != last_status:
+                                    last_status = current_status
+                                    
+                                    # Check if order is finalized
+                                    if current_status in [OrderStatus.CONFIRMED.value, OrderStatus.CANCELLED.value]:
+                                        elapsed = (datetime.utcnow() - start_time).total_seconds()
+                                        live.update(self._create_status_display(
+                                            f"✅ Order finalized! Status: {current_status}",
+                                            elapsed=elapsed
+                                        ))
+                                        await asyncio.sleep(1)
+                                        return
+                                    
+                                    # Update display with current status
+                                    pending_count = sum(
+                                        len(users) for users in 
+                                        order_data.get("pending_responses", {}).values()
+                                    )
                                     elapsed = (datetime.utcnow() - start_time).total_seconds()
+                                    
                                     live.update(self._create_status_display(
-                                        f"✅ Order finalized! Status: {current_status}",
+                                        f"Status: {current_status} | Pending: {pending_count} users",
                                         elapsed=elapsed
                                     ))
-                                    await asyncio.sleep(1)
-                                    return
-                                
-                                # Update display with current status
-                                pending_count = sum(
-                                    len(users) for users in 
-                                    order_data.get("pending_responses", {}).values()
-                                )
-                                elapsed = (datetime.utcnow() - start_time).total_seconds()
-                                
-                                live.update(self._create_status_display(
-                                    f"Status: {current_status} | Pending: {pending_count} users",
-                                    elapsed=elapsed
-                                ))
-                        else:
-                            logger.warning(f"Failed to fetch order status: {response.status_code}")
-                        
-                except httpx.RequestError as e:
-                    logger.debug(f"Error polling order status: {e}")
-                    # Continue polling even if one request fails
-                
-                # Check timeout
-                elapsed = (datetime.utcnow() - start_time).total_seconds()
-                if elapsed >= timeout_seconds:
-                    live.update(self._create_status_display(
-                        f"⏱️ Timeout reached ({timeout_seconds}s). Order may still be pending.",
-                        elapsed=elapsed
-                    ))
-                    await asyncio.sleep(1)
-                    return
-                
-                await asyncio.sleep(poll_interval)
+                            else:
+                                logger.warning(f"Failed to fetch order status: {response.status_code}")
+                            
+                    except httpx.RequestError as e:
+                        logger.debug(f"Error polling order status: {e}")
+                        # Continue polling even if one request fails
+                    except Exception as e:
+                        logger.debug(f"Error in wait loop: {e}")
+                        # Continue polling
+                    
+                    # Check timeout (only if timeout_seconds > 0, otherwise infinite loop)
+                    if timeout_seconds > 0:
+                        elapsed = (datetime.utcnow() - start_time).total_seconds()
+                        if elapsed >= timeout_seconds:
+                            live.update(self._create_status_display(
+                                f"⏱️ Timeout reached ({timeout_seconds}s). Order may still be pending.",
+                                elapsed=elapsed
+                            ))
+                            await asyncio.sleep(1)
+                            return
+                    
+                    await asyncio.sleep(poll_interval)
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Exiting wait loop. You can continue with other commands.[/yellow]")
+                return
     
     def _create_status_display(self, message: str, elapsed: float = 0) -> Text:
         """Create a status display text for the live update."""

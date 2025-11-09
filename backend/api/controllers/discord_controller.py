@@ -1,80 +1,105 @@
 """
-Controller for WhatsApp-related operations.
+Controller for Discord-related operations.
 """
 from typing import Dict, Any, Optional
 from loguru import logger
 
-from modules.whatsapp import WhatsAppService
+from modules.discord import DiscordService
 from modules.ordering import OrderingService
 from api.dependencies import agent
 from models.order import Order
 from models.user import User
 
 
-class WhatsAppController:
-    """Controller for handling WhatsApp webhook messages."""
+class DiscordController:
+    """Controller for handling Discord bot messages."""
     
     def __init__(self):
-        self.whatsapp_service = WhatsAppService()
+        self.discord_service = DiscordService()
         self.ordering_service = OrderingService()
         self.agent = agent  # Use shared agent instance for conversation context
     
     async def process_incoming_message(
         self,
-        from_number: str,
-        message_body: str,
-        message_sid: str,
+        user_id: str,
+        channel_id: str,
+        message_content: str,
+        author_name: str,
     ) -> Dict[str, Any]:
         """
-        Process an incoming WhatsApp message.
+        Process an incoming Discord message.
         
         Args:
-            from_number: Phone number that sent the message (format: whatsapp:+1234567890)
-            message_body: Message content
-            message_sid: Twilio message SID
+            user_id: Discord user ID (we'll need to map this to our User model)
+            channel_id: Discord channel ID where message was sent
+            message_content: Message content
+            author_name: Discord username
             
         Returns:
             Dict with success status and optional error message
         """
         try:
-            # Extract phone number (remove whatsapp: prefix)
-            phone_number = from_number.replace("whatsapp:", "")
+            # Find household by channel_id first
+            from models.household import Household
+            household = await Household.find_one(Household.discord_channel_id == channel_id)
             
-            # Find user by phone number
-            user = await User.find_one(User.phone == phone_number)
+            if not household:
+                logger.warning(f"No household found for Discord channel: {channel_id}")
+                return {"success": False, "error": "Channel not linked to household"}
+            
+            # Try to find user by Discord user ID first (most reliable)
+            user = None
+            if user_id:
+                user = await User.find_one(User.discord_user_id == str(user_id))
+            
+            # Fallback: Try to find user by name in household members
             if not user:
-                logger.warning(f"No user found for phone number: {phone_number}")
-                return {"success": False, "error": "User not found"}
+                users = await User.find(
+                    User.household_id == household.household_id,
+                    User.is_active == True
+                ).to_list()
+                
+                # Try to match by name (case-insensitive)
+                for u in users:
+                    if u.name.lower() == author_name.lower():
+                        user = u
+                        # Update user with Discord ID if we found them by name
+                        if not u.discord_user_id and user_id:
+                            u.discord_user_id = str(user_id)
+                            await u.save()
+                            logger.info(f"Updated user {u.user_id} with Discord user ID: {user_id}")
+                        break
+            
+            if not user:
+                logger.warning(f"No user found for Discord message from {author_name} (ID: {user_id}) in channel {channel_id}")
+                return {"success": False, "error": "User not found. Please ensure your Discord user ID is set in your profile."}
             
             # Relay message to agent for context
-            # Format: "WhatsApp message: {message_body}"
-            whatsapp_context = f"WhatsApp message from {user.name}: {message_body}"
+            discord_context = f"Discord message from {user.name}: {message_content}"
             await self.agent.add_message_to_conversation(
                 user_id=user.user_id,
-                message=whatsapp_context,
+                message=discord_context,
                 role="user"
             )
-            logger.info(f"Relayed WhatsApp message to agent for user {user.user_id}")
+            logger.info(f"Relayed Discord message to agent for user {user.user_id}")
             
             # Check if this is a response to a pending group order
-            # Look for pending group orders for this user's household
             if not user.household_id:
                 return {"success": False, "error": "User not in a household"}
             
-            # Find pending group orders - sort by timestamp descending to get most recent first
+            # Find pending group orders
             from models.order import OrderStatus
             pending_orders = await Order.find(
                 Order.household_id == user.household_id,
                 Order.is_group_order == True,
                 Order.status == OrderStatus.PENDING
-            ).sort("-timestamp").to_list()
+            ).to_list()
             
             if not pending_orders:
                 return {"success": True, "message": "No pending orders"}
             
-            # Get the most recent pending order (first in sorted list)
+            # Get the most recent pending order
             order = pending_orders[0]
-            logger.info(f"Found {len(pending_orders)} pending orders. Using most recent: {order.order_id} created at {order.timestamp}")
             
             # Check if user needs to respond to this order
             user_needs_to_respond = False
@@ -87,48 +112,26 @@ class WhatsAppController:
                 return {"success": True, "message": "No response needed"}
             
             # Parse the response - only use items that are in pending_responses for this user
-            # This ensures we only process items the user actually needs to respond to
             pending_item_names = [
                 item_name for item_name, pending_users in order.pending_responses.items()
                 if user.user_id in pending_users
             ]
             
-            logger.info(f"Processing response for order {order.order_id}")
-            logger.info(f"Order items in order: {[item.name for item in order.items]}")
-            logger.info(f"Pending responses keys: {list(order.pending_responses.keys())}")
-            logger.info(f"Pending items for user {user.user_id}: {pending_item_names}")
-            
             # Get only the items that are pending for this user
-            # Match by exact name match first, then try case-insensitive matching
-            order_items = []
-            for item in order.items:
-                # Try exact match first
-                if item.name in pending_item_names:
-                    order_items.append({
-                        "name": item.name,
-                        "quantity": item.quantity,
-                        "unit": item.unit
-                    })
-                else:
-                    # Try case-insensitive matching
-                    item_name_lower = item.name.lower()
-                    for pending_name in pending_item_names:
-                        if pending_name.lower() == item_name_lower:
-                            order_items.append({
-                                "name": item.name,  # Use the order item name, not pending name
-                                "quantity": item.quantity,
-                                "unit": item.unit
-                            })
-                            break
+            order_items = [
+                {"name": item.name, "quantity": item.quantity, "unit": item.unit}
+                for item in order.items
+                if item.name in pending_item_names
+            ]
             
-            logger.info(f"Filtered order items for response: {[item['name'] for item in order_items]}")
+            logger.info(f"Processing Discord response for order {order.order_id}. Pending items for user: {pending_item_names}")
             
-            parsed_response = self.whatsapp_service.parse_order_response(
-                message_body,
+            parsed_response = self.discord_service.parse_order_response(
+                message_content,
                 order_items
             )
             
-            logger.info(f"Parsed response: {parsed_response}")
+            logger.info(f"Parsed Discord response: {parsed_response}")
             
             # Process the response
             updated_order = await self.ordering_service.process_group_order_response(
@@ -138,7 +141,7 @@ class WhatsAppController:
             )
             
             if updated_order:
-                # Send confirmation message - use the items from parsed_response which are correct
+                # Send confirmation message via Discord
                 if parsed_response.get("confirmed") and parsed_response.get("items"):
                     items_str = ", ".join([
                         f"{item['name']} ({item.get('quantity', 1)})"
@@ -146,21 +149,20 @@ class WhatsAppController:
                     ])
                     confirmation = f"✅ Added to order: {items_str}"
                 elif parsed_response.get("confirmed"):
-                    # If confirmed but no items (shouldn't happen, but handle gracefully)
                     items_str = ", ".join(pending_item_names)
                     confirmation = f"✅ Added to order: {items_str}"
                 else:
                     confirmation = "✅ Noted - you don't need these items."
                 
-                # Send confirmation via WhatsApp
-                if user.phone:
-                    await self.whatsapp_service.send_message(
-                        to=user.phone,
-                        message=confirmation
+                # Send confirmation via Discord
+                if household.discord_channel_id:
+                    await self.discord_service.send_message_to_channel(
+                        int(household.discord_channel_id),
+                        f"{user.name}: {confirmation}"
                     )
                 
                 # Also relay the confirmation back to agent so it appears in CLI
-                confirmation_context = f"WhatsApp confirmation sent: {confirmation}"
+                confirmation_context = f"Discord confirmation sent: {confirmation}"
                 await self.agent.add_message_to_conversation(
                     user_id=user.user_id,
                     message=confirmation_context,
@@ -172,6 +174,6 @@ class WhatsAppController:
                 return {"success": False, "error": "Failed to process response"}
                 
         except Exception as e:
-            logger.error(f"Error processing WhatsApp message: {e}")
+            logger.error(f"Error processing Discord message: {e}")
             return {"success": False, "error": str(e)}
 

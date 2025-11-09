@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     splitwise_consumer_key: Optional[str] = None
     splitwise_consumer_secret: Optional[str] = None
     splitwise_group_id: Optional[str] = None
+    # Note: Callback URL is managed by frontend and Splitwise app settings, not backend
 
     # Thuisbezorgd
     thuisbezorgd_email: Optional[str] = None
@@ -63,6 +64,10 @@ class Settings(BaseSettings):
     whatsapp_auth_token: Optional[str] = None  # Twilio Auth Token
     whatsapp_from_number: Optional[str] = None  # WhatsApp number from Twilio (format: whatsapp:+1234567890)
     whatsapp_webhook_url: Optional[str] = None  # Webhook URL for receiving messages
+
+    # Discord
+    discord_bot_token: Optional[str] = None  # Discord bot token from Discord Developer Portal
+    discord_permission_id: Optional[str] = None  # Discord permission ID for the bot
 
     # Application
     app_env: str = "development"

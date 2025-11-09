@@ -8,8 +8,10 @@ from modules.inventory import InventoryService
 from modules.ordering import OrderingService
 from modules.splitwise import SplitwiseService
 from modules.whatsapp import WhatsAppService
+from modules.discord import DiscordService
 from models.user import User
 from models.household import Household
+from beanie.operators import In
 
 
 class ToolHandlers:
@@ -23,6 +25,7 @@ class ToolHandlers:
         ordering_service: OrderingService,
         splitwise_service: SplitwiseService,
         whatsapp_service: WhatsAppService,
+        discord_service: Optional[DiscordService] = None,
         update_system_prompt_callback: Optional[Callable[[str], Awaitable[None]]] = None,
     ):
         """
@@ -33,12 +36,14 @@ class ToolHandlers:
             ordering_service: Ordering service instance
             splitwise_service: Splitwise service instance
             whatsapp_service: WhatsApp service instance
+            discord_service: Discord service instance (optional)
             update_system_prompt_callback: Optional callback to update system prompt when preferences change
         """
         self.inventory_service = inventory_service
         self.ordering_service = ordering_service
         self.splitwise_service = splitwise_service
         self.whatsapp_service = whatsapp_service
+        self.discord_service = discord_service or DiscordService()
         self.update_system_prompt_callback = update_system_prompt_callback
     
     def normalize_allergy(self, allergy: str) -> str:
@@ -633,7 +638,12 @@ class ToolHandlers:
                     }
                 update_fields["shared"] = True
                 update_fields["household_id"] = household_id
-                update_fields["user_id"] = None
+                # Preserve the original user_id to track who originally owned/created the item
+                # Only set user_id if the item doesn't have one (edge case - shouldn't happen for personal items)
+                if not item.user_id:
+                    update_fields["user_id"] = user_id
+                # If item already has a user_id, we don't include it in update_fields
+                # so it remains unchanged (preserving the original owner)
             else:
                 # Making it personal - move to user
                 update_fields["shared"] = False
@@ -771,4 +781,170 @@ class ToolHandlers:
                     "success": False,
                     "error": f"Failed to send WhatsApp message to {phone_number}",
                 }
+    
+    async def get_housemates(
+        self,
+        *,
+        user_id: Optional[str] = None,
+        include_contact_info: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Get a list of all housemates in the user's household.
+        
+        Args:
+            user_id: ID of the user (required)
+            include_contact_info: Whether to include phone numbers and email addresses
+            
+        Returns:
+            Dict with list of housemates and their information
+        """
+        if not user_id:
+            return {
+                "error": "User ID is required to get housemates",
+            }
+        
+        # Get user to find household
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            return {
+                "error": f"User not found: {user_id}",
+            }
+        
+        if not user.household_id:
+            return {
+                "housemates": [],
+                "household": None,
+                "message": "User is not part of a household",
+            }
+        
+        # Get household
+        household = await Household.find_one(Household.household_id == user.household_id)
+        if not household:
+            return {
+                "housemates": [],
+                "household": None,
+                "message": "Household not found",
+            }
+        
+        # Get all household members
+        if not household.member_ids:
+            return {
+                "housemates": [],
+                "household": {
+                    "name": household.name,
+                    "household_id": household.household_id,
+                },
+                "message": "No housemates found",
+            }
+        
+        # Fetch all user details
+        users = await User.find(
+            In(User.user_id, household.member_ids),
+            User.is_active == True
+        ).to_list()
+        
+        housemates = []
+        for housemate in users:
+            housemate_info = {
+                "user_id": housemate.user_id,
+                "name": housemate.name,
+                "is_current_user": housemate.user_id == user_id,
+            }
+            
+            if include_contact_info:
+                if housemate.phone:
+                    housemate_info["phone"] = housemate.phone
+                if housemate.email:
+                    housemate_info["email"] = housemate.email
+            
+            housemates.append(housemate_info)
+        
+        return {
+            "housemates": housemates,
+            "household": {
+                "name": household.name,
+                "household_id": household.household_id,
+                "total_members": len(housemates),
+            },
+            "count": len(housemates),
+        }
+    
+    async def send_discord_message(
+        self,
+        message: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Send a Discord message to the household's Discord channel.
+        
+        Args:
+            message: The message content to send
+            user_id: ID of the user (required)
+            
+        Returns:
+            Dict with success status and details
+        """
+        if not self.discord_service.is_configured():
+            return {
+                "success": False,
+                "error": "Discord service is not configured. Please configure Discord bot token.",
+            }
+        
+        if not user_id:
+            return {
+                "success": False,
+                "error": "user_id is required when sending Discord message",
+            }
+        
+        # Get user to find household
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": f"User {user_id} not found",
+            }
+        
+        if not user.household_id:
+            return {
+                "success": False,
+                "error": "User is not part of a household",
+            }
+        
+        # Get household
+        household = await Household.find_one(Household.household_id == user.household_id)
+        if not household:
+            return {
+                "success": False,
+                "error": f"Household not found for user {user_id}",
+            }
+        
+        if not household.discord_channel_id:
+            return {
+                "success": False,
+                "error": "Household does not have a Discord channel configured. Please configure discord_channel_id in the household settings.",
+            }
+        
+        # Send to Discord channel
+        logger.info(f"Sending Discord message to household {household.household_id}, channel {household.discord_channel_id}")
+        logger.debug(f"Message: {message}")
+        
+        message_id = await self.discord_service.send_message_to_channel(
+            int(household.discord_channel_id),
+            message
+        )
+        
+        if message_id:
+            logger.info(f"Discord message sent successfully. Message ID: {message_id}")
+            return {
+                "success": True,
+                "message": f"Discord message sent to household channel",
+                "message_id": message_id,
+            }
+        else:
+            logger.error(f"Failed to send Discord message to channel {household.discord_channel_id}")
+            logger.error("Check logs above for detailed error information")
+            return {
+                "success": False,
+                "error": "Failed to send Discord message. Check server logs for details. Possible causes: bot not ready, invalid channel ID, or missing permissions.",
+            }
 

@@ -13,6 +13,7 @@ from models.inventory import InventoryItem
 from models.user import User
 from models.household import Household
 from modules.whatsapp import WhatsAppService
+from modules.discord import DiscordService
 from modules.user_inventory.service import UserInventoryService
 from config import settings
 from utils.cache import get_order_cache, cached_query
@@ -33,6 +34,7 @@ class OrderingService:
         self.password = settings.thuisbezorgd_password
         self.cache = get_order_cache()
         self.whatsapp_service = WhatsAppService()
+        self.discord_service = DiscordService()
         self.user_inventory_service = UserInventoryService()
         logger.info("Ordering service initialized with cache")
     
@@ -290,46 +292,57 @@ class OrderingService:
             )
             await order.insert()
             
-            # Send WhatsApp notification if group order
+            # Send notification if group order (try Discord first, fallback to WhatsApp)
             if is_group_order and household and hasattr(household, 'household_id'):
-                if not self.whatsapp_service.is_configured():
-                    logger.warning(
-                        f"Group order {order.order_id} created but WhatsApp service is not configured. "
-                        f"Order will be created as group order but no WhatsApp message will be sent."
+                items_for_message = [
+                    {
+                        "name": item.get("name", ""),
+                        "quantity": item.get("quantity", 0),
+                        "unit": item.get("unit", "piece")
+                    }
+                    for item in shared_items
+                ]
+                
+                # Get household_id safely
+                hh_id = getattr(household, 'household_id', None)
+                success = False
+                message_sent_via = None
+                
+                # Try Discord first if configured
+                if hh_id and household.discord_channel_id and self.discord_service.is_configured():
+                    success = await self.discord_service.send_group_order_notification(
+                        household_id=hh_id,
+                        order_id=order.order_id,
+                        items=items_for_message,
+                        created_by_user=created_by or "",
+                        response_deadline=order.response_deadline or datetime.utcnow(),
                     )
-                    order.whatsapp_message_sent = False
-                    await order.save()
+                    message_sent_via = "discord" if success else None
+                
+                # Fallback to WhatsApp if Discord failed or not configured
+                if not success and hh_id and self.whatsapp_service.is_configured():
+                    success = await self.whatsapp_service.send_group_order_notification(
+                        household_id=hh_id,
+                        order_id=order.order_id,
+                        items=items_for_message,
+                        created_by_user=created_by or "",
+                        response_deadline=order.response_deadline or datetime.utcnow(),
+                    )
+                    message_sent_via = "whatsapp" if success else None
+                
+                if not success:
+                    logger.warning(
+                        f"Group order {order.order_id} created but no messaging service is configured. "
+                        f"Order will be created as group order but no notification will be sent."
+                    )
+                
+                order.whatsapp_message_sent = success  # Keep field name for backward compatibility
+                await order.save()
+                
+                if success:
+                    logger.info(f"Group order notification sent via {message_sent_via} for order {order.order_id}")
                 else:
-                    items_for_message = [
-                        {
-                            "name": item.get("name", ""),
-                            "quantity": item.get("quantity", 0),
-                            "unit": item.get("unit", "piece")
-                        }
-                        for item in shared_items
-                    ]
-                    
-                    # Get household_id safely
-                    hh_id = getattr(household, 'household_id', None)
-                    if hh_id:
-                        success = await self.whatsapp_service.send_group_order_notification(
-                            household_id=hh_id,
-                            order_id=order.order_id,
-                            items=items_for_message,
-                            created_by_user=created_by or "",
-                            response_deadline=order.response_deadline or datetime.utcnow(),
-                        )
-                    else:
-                        success = False
-                        logger.warning(f"Could not get household_id from household object")
-                    
-                    order.whatsapp_message_sent = success
-                    await order.save()
-                    
-                    if success:
-                        logger.info(f"WhatsApp notification sent for group order {order.order_id}")
-                    else:
-                        logger.warning(f"Failed to send WhatsApp notification for order {order.order_id}")
+                    logger.warning(f"Failed to send group order notification for order {order.order_id}")
             
             # For group orders, keep status as PENDING until responses are collected
             # For regular orders, mark as confirmed
@@ -549,19 +562,29 @@ class OrderingService:
                     user_ids=user_ids,
                 )
         
-        # Send update to WhatsApp group
-        if order.household_id and self.whatsapp_service.is_configured():
+        # Send update to messaging service (Discord or WhatsApp)
+        if order.household_id:
             update_message = (
                 f"✅ Group order finalized!\n\n"
                 f"Total: €{order.total:.2f}\n"
                 f"Items updated based on responses.\n\n"
                 f"Your individual inventories have been updated."
             )
-            await self.whatsapp_service.send_order_update(
-                household_id=order.household_id,
-                order_id=order.order_id,
-                update_message=update_message,
-            )
+            
+            # Try Discord first
+            household = await Household.find_one(Household.household_id == order.household_id)
+            if household and household.discord_channel_id and self.discord_service.is_configured():
+                await self.discord_service.send_order_update(
+                    household_id=order.household_id,
+                    order_id=order.order_id,
+                    update_message=update_message,
+                )
+            elif self.whatsapp_service.is_configured():
+                await self.whatsapp_service.send_order_update(
+                    household_id=order.household_id,
+                    order_id=order.order_id,
+                    update_message=update_message,
+                )
         
         logger.info(f"Group order {order.order_id} finalized")
     

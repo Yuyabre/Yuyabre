@@ -50,6 +50,18 @@ class UserPreferenceRequest(BaseModel):
     disliked_items: List[str] = []
 
 
+class UpdateUserPreferencesRequest(BaseModel):
+    """Request model for updating user preferences (supports add/remove)."""
+    dietary_restrictions: Optional[List[str]] = None
+    allergies: Optional[List[str]] = None
+    favorite_brands: Optional[List[str]] = None
+    disliked_items: Optional[List[str]] = None
+    remove_dietary_restrictions: Optional[List[str]] = None
+    remove_allergies: Optional[List[str]] = None
+    remove_favorite_brands: Optional[List[str]] = None
+    remove_disliked_items: Optional[List[str]] = None
+
+
 class SignupRequest(BaseModel):
     """Request model for user signup."""
     name: str
@@ -57,6 +69,7 @@ class SignupRequest(BaseModel):
     password: str
     phone: Optional[str] = None
     splitwise_user_id: Optional[str] = None
+    discord_user_id: Optional[str] = None  # Discord user ID for message matching
     preferences: Optional[UserPreferenceRequest] = None
 
 
@@ -74,9 +87,19 @@ class UserResponse(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    discord_user_id: Optional[str] = None  # Discord user ID for message matching
     household_id: Optional[str] = None
     is_active: bool
     joined_date: str
+    preferences: Optional[UserPreferenceRequest] = None
+
+
+class UpdatePreferencesResponse(BaseModel):
+    """Response model for updating user preferences."""
+    success: bool
+    message: str
+    updated_fields: List[str] = []
+    current_preferences: Optional[UserPreferenceRequest] = None
 
 
 class JoinHouseholdRequest(BaseModel):
@@ -93,6 +116,7 @@ class CreateHouseholdRequest(BaseModel):
     country: Optional[str] = None
     whatsapp_group_id: Optional[str] = None
     whatsapp_group_name: Optional[str] = None
+    discord_channel_id: Optional[str] = None  # Discord channel ID for household notifications
     notes: Optional[str] = None
 
 
@@ -107,6 +131,7 @@ class HouseholdResponse(BaseModel):
     country: Optional[str] = None
     whatsapp_group_id: Optional[str] = None
     whatsapp_group_name: Optional[str] = None
+    discord_channel_id: Optional[str] = None  # Discord channel ID for household notifications
     member_ids: List[str] = []
     created_at: str
     is_active: bool

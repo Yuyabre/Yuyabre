@@ -75,9 +75,9 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                 "name": "place_order",
                 "description": "Create a grocery order with the specified items. "
                 "If any items are marked as 'shared' in the inventory, the system will automatically "
-                "create a group order and send a WhatsApp message to household members asking if they need those items too. "
+                "create a group order and send a Discord message (or WhatsApp if Discord not configured) to household members asking if they need those items too. "
                 "The order will be updated based on housemates' responses. "
-                "The tool will return `is_group_order: true` and `whatsapp_sent: true` if this happens.",
+                "The tool will return `is_group_order: true` and `whatsapp_sent: true` (field name used for both Discord and WhatsApp) if this happens.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -254,7 +254,8 @@ def build_tool_specs() -> List[Dict[str, Any]]:
             "function": {
                 "name": "send_whatsapp_message",
                 "description": "Send a WhatsApp message to household members or a specific user. "
-                "Use this when the user explicitly asks to send a message via WhatsApp, or when you need to notify household members about something important. "
+                "This is a FALLBACK option. Always prefer `send_discord_message` first. "
+                "Only use WhatsApp if Discord is not configured for the household or if the user explicitly requests WhatsApp. "
                 "You can send to the entire household or to a specific user by phone number.",
                 "parameters": {
                     "type": "object",
@@ -271,6 +272,45 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                         "phone_number": {
                             "type": "string",
                             "description": "Phone number in international format (e.g., '+31612345678'). Required if to_household is false.",
+                        },
+                    },
+                    "required": ["message"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_housemates",
+                "description": "Get a list of all housemates in the user's household, including their contact information (name, phone, email). "
+                "Use this when the user asks about housemates, flatmates, or wants to know who lives in the household. "
+                "This helps you identify who to contact or send messages to.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "include_contact_info": {
+                            "type": "boolean",
+                            "description": "Whether to include phone numbers and email addresses. Defaults to true.",
+                            "default": True,
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "send_discord_message",
+                "description": "Send a Discord message to the household's Discord channel. "
+                "This is the PRIMARY and PREFERRED method for sending messages to housemates. "
+                "Use this when the user asks to send a message to housemates, notify the household, or communicate with flatmates. "
+                "Always prefer Discord over WhatsApp. Only use WhatsApp if Discord is not configured for the household.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "description": "The message content to send via Discord.",
                         },
                     },
                     "required": ["message"],
