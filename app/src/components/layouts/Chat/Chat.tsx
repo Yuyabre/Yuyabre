@@ -8,7 +8,6 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { ChatMessages } from "./ChatMessages";
-import { ChatSuggestedActions } from "./ChatSuggestedActions";
 import { ChatInputForm } from "./ChatInputForm";
 import { useActions } from "@/hooks/useActions";
 import { useScrollToBottom } from "@/hooks/useScrollToBottom";
@@ -142,6 +141,8 @@ export function Chat() {
 
     return result;
   }, [staticMessages, streamingMessages]);
+
+  const isStreaming = streamingMessages.size > 0;
 
   const enqueueChunkUpdate = (messageId: string, updater: () => void): void => {
     const currentQueue =
@@ -303,6 +304,10 @@ export function Chat() {
 
   const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isStreaming) {
+      return;
+    }
+
     const trimmedInput = input.trim();
     if (!trimmedInput) {
       return;
@@ -321,11 +326,7 @@ export function Chat() {
           messagesContainerRef={messagesContainerRef}
           messagesEndRef={messagesEndRef}
           onOrderApproved={handleOrderApproved}
-        />
-
-        <ChatSuggestedActions
-          visible={messageNodes.length === 0}
-          onSelect={handleSuggestedAction}
+          onSuggestedAction={handleSuggestedAction}
         />
 
         <ChatInputForm
@@ -333,6 +334,7 @@ export function Chat() {
           inputValue={input}
           onInputChange={setInput}
           onSubmit={handleFormSubmit}
+          isStreaming={isStreaming}
         />
       </div>
     </div>

@@ -72,6 +72,12 @@ export interface UpdateHouseholdRequest {
   notes?: string | null;
 }
 
+export interface UpdateUserRequest {
+  name?: string;
+  phone?: string | null;
+  discord_user_id?: string | null;
+}
+
 export interface SplitwiseGroup {
   id: string;
   name: string;

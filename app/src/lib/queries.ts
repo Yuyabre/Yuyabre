@@ -12,6 +12,7 @@ import type {
   LoginRequest,
   SignupRequest,
   UpdateHouseholdRequest,
+  UpdateUserRequest,
   User,
 } from "../types/users";
 import type { InventoryItem, InventoryItemCreate, InventoryItemUpdate, Expense } from "../types";
@@ -184,6 +185,20 @@ export const useUpdateHousehold = () => {
         ['household', variables.householdId],
         updatedHousehold
       );
+    },
+  });
+};
+
+export const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation<
+    User,
+    Error,
+    { userId: string; data: UpdateUserRequest }
+  >({
+    mutationFn: ({ userId, data }) => authApi.updateUser(userId, data),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['user', updatedUser.user_id], updatedUser);
     },
   });
 };

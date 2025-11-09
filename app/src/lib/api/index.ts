@@ -16,7 +16,7 @@ export {
 export { inventoryApi } from "./inventory";
 
 // Orders API
-export { ordersApi, placeOrderWithStream } from "./orders";
+export { ordersApi } from "./orders";
 
 // Expenses API
 export { expensesApi } from "./expenses";

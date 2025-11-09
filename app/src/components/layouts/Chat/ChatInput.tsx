@@ -8,9 +8,19 @@ interface ChatInputProps
 }
 
 export const ChatInput = forwardRef<HTMLInputElement, ChatInputProps>(
-  ({ value, onChange, className, id = "chat-input", ...props }, ref) => {
+  (
+    {
+      value,
+      onChange,
+      className,
+      id = "chat-input",
+      disabled,
+      ...props
+    },
+    ref
+  ) => {
     return (
-      <>
+      <div className="flex-1">
         <Label htmlFor={id} className="sr-only">
           Send a message
         </Label>
@@ -20,13 +30,15 @@ export const ChatInput = forwardRef<HTMLInputElement, ChatInputProps>(
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`bg-muted rounded-md px-2 py-1.5 w-full outline-none text-foreground md:max-w-[500px] max-w-[calc(100dvw-32px)] border border-border focus:ring-2 focus:ring-ring ${
-            className || ""
-          }`}
+          disabled={disabled}
+          className={
+            "w-full border border-transparent bg-muted/60 px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-0 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60" +
+            (className ? ` ${className}` : "")
+          }
           placeholder="Send a message..."
           {...props}
         />
-      </>
+      </div>
     );
   }
 );

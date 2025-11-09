@@ -5,6 +5,7 @@ import type {
   LoginRequest,
   SignupRequest,
   UpdateHouseholdRequest,
+  UpdateUserRequest,
   User,
 } from "@/types/users";
 import { getApiBaseUrl } from "../utils";
@@ -143,6 +144,12 @@ export const authApi = {
         body: payload,
       }
     ),
+
+  updateUser: (userId: string, payload: UpdateUserRequest) =>
+    request<User>(`/auth/users/${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
   // Splitwise OAuth methods
   getSplitwiseAuthorizeUrl: (userId: string, callbackUrl: string) => {
