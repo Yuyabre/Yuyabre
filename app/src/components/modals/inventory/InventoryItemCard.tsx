@@ -19,7 +19,7 @@ interface InventoryItemCardProps {
   onEdit?: () => void;
 }
 
-export function InventoryItemCard({ item, onEdit }: InventoryItemCardProps) {
+export function InventoryItemCard({ item }: InventoryItemCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [quantity, setQuantity] = useState(item.quantity.toString());
   const [threshold, setThreshold] = useState(item.threshold.toString());

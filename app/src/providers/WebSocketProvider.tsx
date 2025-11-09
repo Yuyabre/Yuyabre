@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import type { ReactNode } from "react";
 import type {
   WebSocketMessage,
   MessageWebSocketData,

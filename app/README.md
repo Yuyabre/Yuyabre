@@ -13,6 +13,11 @@ A React application for shared flat grocery management, built with Vite, Radix U
 
 ## Features
 
+### 📱 Progressive Web App
+- Installable experience with offline-first caching
+- Works well on mobile, tablet, and desktop
+- Automatic updates when new versions are deployed
+
 ### 🗂️ Inventory Management
 - View all inventory items with quantities and expiration dates
 - Low stock alerts and warnings
@@ -71,6 +76,15 @@ pnpm build
 ```bash
 pnpm preview
 ```
+
+## Progressive Web App
+
+The application is configured as a Progressive Web App (PWA) using `vite-plugin-pwa`. A service worker precaches the production build output and keeps clients up to date automatically.
+
+- **Run locally:** `pnpm dev` (PWA features are enabled in development mode for testing).
+- **Trigger a new build:** `pnpm build` generates the service worker and updates the precache manifest.
+- **Install:** Open the site in a supported browser (Chrome, Edge, Safari on iOS 16.4+) and use the browser's install prompt or *Add to Home Screen*.
+- **Update assets:** Replace the files in `public/icons/` and adjust the manifest configuration inside `vite.config.ts` if you need different branding.
 
 ## Project Structure
 

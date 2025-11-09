@@ -24,8 +24,7 @@ function App() {
   const [householdOpen, setHouseholdOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [hasPromptedHousehold, setHasPromptedHousehold] = useState(false);
-  const { currentUser, currentHousehold, setCurrentUser, setCurrentHousehold } =
-    useStore();
+  const { currentUser, setCurrentUser, setCurrentHousehold } = useStore();
 
   // Fetch latest user info when we have a user_id
   const { data: fetchedUser, isLoading: isLoadingUser } = useGetUser(

@@ -1,6 +1,6 @@
 import type { InventoryItem, Expense } from "../../types";
 import type { Order } from "../../types/orders";
-import type { User, Group } from "../../types/users";
+import type { User } from "../../types/users";
 
 // Simulate network delay
 export const delay = (ms = 500): Promise<void> =>
@@ -9,54 +9,59 @@ export const delay = (ms = 500): Promise<void> =>
 // Mock inventory data
 export const mockInventory: InventoryItem[] = [
   {
-    id: "1",
+    item_id: "1",
     name: "Milk",
     category: "Dairy",
     quantity: 2,
     unit: "liters",
     threshold: 1,
-    expirationDate: "2025-01-20",
+    expiration_date: "2025-01-20",
     shared: true,
+    last_updated: new Date().toISOString(),
   },
   {
-    id: "2",
+    item_id: "2",
     name: "Eggs",
     category: "Dairy",
     quantity: 6,
     unit: "pieces",
     threshold: 4,
-    expirationDate: "2025-01-18",
+    expiration_date: "2025-01-18",
     shared: true,
+    last_updated: new Date().toISOString(),
   },
   {
-    id: "3",
+    item_id: "3",
     name: "Bread",
     category: "Bakery",
     quantity: 1,
     unit: "loaf",
     threshold: 1,
-    expirationDate: "2025-01-17",
+    expiration_date: "2025-01-17",
     shared: true,
+    last_updated: new Date().toISOString(),
   },
   {
-    id: "4",
+    item_id: "4",
     name: "Tomatoes",
     category: "Vegetables",
     quantity: 8,
     unit: "pieces",
     threshold: 4,
-    expirationDate: "2025-01-19",
+    expiration_date: "2025-01-19",
     shared: true,
+    last_updated: new Date().toISOString(),
   },
   {
-    id: "5",
+    item_id: "5",
     name: "Cheese",
     category: "Dairy",
     quantity: 0.5,
     unit: "kg",
     threshold: 0.2,
-    expirationDate: "2025-01-22",
+    expiration_date: "2025-01-22",
     shared: true,
+    last_updated: new Date().toISOString(),
   },
 ];
 
@@ -122,40 +127,12 @@ export const mockExpenses: Expense[] = [
   },
 ];
 
-// Mock user/group data
+// Mock user data
 export const mockUser: User = {
-  id: "user-1",
+  user_id: "user-1",
   name: "John Doe",
   email: "john@example.com",
-  isAdmin: true,
-};
-
-export const mockGroup: Group = {
-  id: "group-1",
-  name: "Main Street Flat",
-  members: [
-    {
-      id: "user-1",
-      name: "John Doe",
-      email: "john@example.com",
-      isAdmin: true,
-      joinedAt: "2024-01-01T00:00:00Z",
-    },
-    {
-      id: "user-2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      isAdmin: false,
-      joinedAt: "2024-01-15T00:00:00Z",
-    },
-    {
-      id: "user-3",
-      name: "Bob Johnson",
-      email: "bob@example.com",
-      isAdmin: false,
-      joinedAt: "2024-02-01T00:00:00Z",
-    },
-  ],
-  createdAt: "2024-01-01T00:00:00Z",
+  is_active: true,
+  joined_date: "2024-01-01T00:00:00Z",
 };
 
