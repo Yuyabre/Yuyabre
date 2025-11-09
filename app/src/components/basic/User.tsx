@@ -1,5 +1,7 @@
+import { toast } from "sonner";
 import { useStore } from "@/store/useStore";
-import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
+import { authStorage } from "@/lib/authStorage";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import {
   DropdownMenu,
@@ -10,15 +12,26 @@ import {
 import { IconChevronDown } from "@tabler/icons-react";
 
 export function User() {
-  const { currentUser } = useStore();
+  const { currentUser, setCurrentUser, setCurrentHousehold } = useStore();
+
+  if (!currentUser) {
+    return null;
+  }
 
   const getInitials = (name: string) => {
     return name
       .split(" ")
-      .map((n) => n[0])
+      .map((segment) => segment.charAt(0))
       .join("")
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleLogout = () => {
+    authStorage.clear();
+    setCurrentUser(null);
+    setCurrentHousehold(null);
+    toast.success("Logged out");
   };
 
   return (
@@ -28,22 +41,18 @@ export function User() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground w-full"
+              className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="flex-shrink-0">
-                <AvatarImage
-                  src={currentUser?.avatar}
-                  alt={currentUser?.name}
-                />
-                <AvatarFallback>
-                  {getInitials(currentUser?.name ?? "Unknown")}
-                </AvatarFallback>
+                <AvatarFallback>{getInitials(currentUser.name)}</AvatarFallback>
               </Avatar>
-              <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-medium">{currentUser?.name}</span>
-                <span className="text-muted-foreground">
-                  {currentUser?.email}
-                </span>
+              <div className="flex flex-col gap-0.5 leading-none text-left">
+                <span className="font-medium truncate">{currentUser.name}</span>
+                {currentUser.email && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {currentUser.email}
+                  </span>
+                )}
               </div>
               <IconChevronDown className="ml-auto" />
             </SidebarMenuButton>
@@ -52,8 +61,8 @@ export function User() {
             className="w-(--radix-dropdown-menu-trigger-width)"
             align="start"
           >
-            <DropdownMenuItem>
-              <span>Logout</span>
+            <DropdownMenuItem onClick={handleLogout}>
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -21,8 +21,8 @@ export { ordersApi, placeOrderWithStream } from "./orders";
 // Expenses API
 export { expensesApi } from "./expenses";
 
-// User/Group API
-export { userApi } from "./users";
+// Authentication API
+export { authApi } from "./auth";
 
 // Legacy Chat API (kept for compatibility)
 import { delay } from "./mocks";

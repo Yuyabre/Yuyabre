@@ -17,6 +17,8 @@ import { Message } from "@/components/basic/Message";
 import { MessageRole, MessageType, type IMessage } from "@/types/chat";
 import { websocketManager } from "@/lib/api/websocket";
 
+const STREAM_CHUNK_DELAY = 30;
+
 const generateId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -38,6 +40,7 @@ export function Chat() {
   >(new Map());
 
   const cleanupFunctionsRef = useRef<Map<string, () => void>>(new Map());
+  const streamQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
@@ -55,6 +58,7 @@ export function Chat() {
         }
       });
       cleanupFunctionsRef.current.clear();
+      streamQueuesRef.current.clear();
     }
 
     setStreamingMessages(new Map());
@@ -131,12 +135,34 @@ export function Chat() {
           role={MessageRole.ASSISTANT}
           type={MessageType.TEXT}
           content={content}
+          {...({ isStreaming: true } as any)}
         />
       );
     });
 
     return result;
   }, [staticMessages, streamingMessages]);
+
+  const enqueueChunkUpdate = (messageId: string, updater: () => void): void => {
+    const currentQueue =
+      streamQueuesRef.current.get(messageId) ?? Promise.resolve();
+
+    const nextQueue = currentQueue
+      .catch(() => {
+        // swallow previous errors to keep queue alive
+      })
+      .then(
+        () =>
+          new Promise<void>((resolve) => {
+            setTimeout(() => {
+              updater();
+              resolve();
+            }, STREAM_CHUNK_DELAY);
+          })
+      );
+
+    streamQueuesRef.current.set(messageId, nextQueue);
+  };
 
   const handleOrderApproved = (approvalMessage: string) => {
     setStaticMessages((msgs) => [
@@ -154,14 +180,17 @@ export function Chat() {
     console.log("Stream started for message:", messageId);
     setStreamingMessages((prev) => new Map(prev.set(messageId, "")));
     cleanupFunctionsRef.current.set(messageId, cleanup);
+    streamQueuesRef.current.set(messageId, Promise.resolve());
   };
 
   const handleStreamChunk = (messageId: string, chunk: string) => {
-    setStreamingMessages((prev) => {
-      const current = prev.get(messageId) || "";
-      const updated = new Map(prev);
-      updated.set(messageId, current + chunk);
-      return updated;
+    enqueueChunkUpdate(messageId, () => {
+      setStreamingMessages((prev) => {
+        const current = prev.get(messageId) || "";
+        const updated = new Map(prev);
+        updated.set(messageId, current + chunk);
+        return updated;
+      });
     });
   };
 
@@ -173,55 +202,69 @@ export function Chat() {
       cleanupFunctionsRef.current.delete(messageId);
     }
 
-    flushSync(() => {
-      setStreamingMessages((prev) => {
-        const next = new Map(prev);
-        next.delete(messageId);
-        return next;
-      });
+    const queue = streamQueuesRef.current.get(messageId) ?? Promise.resolve();
+    queue
+      .catch(() => {
+        // ignore queue errors
+      })
+      .then(() => {
+        streamQueuesRef.current.delete(messageId);
+        flushSync(() => {
+          setStreamingMessages((prev) => {
+            const next = new Map(prev);
+            next.delete(messageId);
+            return next;
+          });
 
-      setStaticMessages((msgs) => {
-        const exists = msgs.some((msg) => msg.id === messageId);
-        if (exists) {
-          console.warn("Message already exists, skipping:", messageId);
-          return msgs;
-        }
+          setStaticMessages((msgs) => {
+            const exists = msgs.some((msg) => msg.id === messageId);
+            if (exists) {
+              console.warn("Message already exists, skipping:", messageId);
+              return msgs;
+            }
 
-        return [
-          ...msgs,
-          {
-            id: messageId,
-            role: MessageRole.ASSISTANT,
-            type: MessageType.TEXT,
-            content: finalContent || "",
-          },
-        ];
+            return [
+              ...msgs,
+              {
+                id: messageId,
+                role: MessageRole.ASSISTANT,
+                type: MessageType.TEXT,
+                content: finalContent || "",
+              },
+            ];
+          });
+        });
       });
-    });
   };
 
   const handleStreamError = (messageId: string, error: Error) => {
-    setStreamingMessages((prev) => {
-      const next = new Map(prev);
-      next.delete(messageId);
-      return next;
-    });
-
     const cleanupFn = cleanupFunctionsRef.current.get(messageId);
     if (cleanupFn) {
       cleanupFn();
       cleanupFunctionsRef.current.delete(messageId);
     }
 
-    setStaticMessages((msgs) => [
-      ...msgs,
-      {
-        id: generateId("error"),
-        role: MessageRole.ASSISTANT,
-        type: MessageType.TEXT,
-        content: `Error: ${error.message}`,
-      },
-    ]);
+    const queue = streamQueuesRef.current.get(messageId) ?? Promise.resolve();
+    queue
+      .catch(() => {})
+      .then(() => {
+        streamQueuesRef.current.delete(messageId);
+        setStreamingMessages((prev) => {
+          const next = new Map(prev);
+          next.delete(messageId);
+          return next;
+        });
+
+        setStaticMessages((msgs) => [
+          ...msgs,
+          {
+            id: generateId("error"),
+            role: MessageRole.ASSISTANT,
+            type: MessageType.TEXT,
+            content: `Error: ${error.message}`,
+          },
+        ]);
+      });
   };
 
   const handleSend = (content: string, userMessage?: IMessage) => {
