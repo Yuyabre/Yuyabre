@@ -304,7 +304,8 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                 "description": "Send a Discord message to the household's Discord channel. "
                 "This is the PRIMARY and PREFERRED method for sending messages to housemates. "
                 "Use this when the user asks to send a message to housemates, notify the household, or communicate with flatmates. "
-                "Always prefer Discord over WhatsApp. Only use WhatsApp if Discord is not configured for the household.",
+                "Always prefer Discord over WhatsApp. Only use WhatsApp if Discord is not configured for the household. "
+                "Returns a context_id that can be used with check_discord_message_responses to check for responses.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -314,6 +315,29 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                         },
                     },
                     "required": ["message"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "check_discord_message_responses",
+                "description": "Check responses to a Discord message that was sent in the current session. "
+                "Use this after sending a Discord message to see if housemates have responded with Yes/No. "
+                "You can check by context_id (returned from send_discord_message) or by message_id. "
+                "This is useful when you need to wait for housemate responses before proceeding with an action.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "context_id": {
+                            "type": "string",
+                            "description": "The context ID returned from send_discord_message. Use this to check responses to a specific message.",
+                        },
+                        "message_id": {
+                            "type": "integer",
+                            "description": "The Discord message ID (alternative to context_id).",
+                        },
+                    },
                 },
             },
         },
@@ -347,6 +371,56 @@ def build_tool_specs() -> List[Dict[str, Any]]:
                         },
                     },
                     "required": ["description", "amount"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_splitwise_expenses",
+                "description": "Get all expenses from Splitwise for the current user. "
+                "Use this when the user asks to see their expenses, view expense history, check what expenses they have, or list all their Splitwise expenses. "
+                "This returns all expenses the user has access to, including expenses they created and expenses shared with them.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_group_order_status",
+                "description": "Retrieve the latest status of a group order, including which housemates have responded on Discord or WhatsApp, the items they confirmed, and any remaining pending responses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "order_id": {
+                            "type": "string",
+                            "description": "The order ID returned when the order was created.",
+                        }
+                    },
+                    "required": ["order_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_order_eta",
+                "description": "Get the estimated time of arrival (ETA) for a delivery order. "
+                "This calculates the ETA based on the order timestamp, distance between the store and delivery location, "
+                "and automatically updates the order status (pending -> confirmed -> processing -> out_for_delivery -> delivered). "
+                "Use this when the user asks about delivery time, ETA, or when their order will arrive.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "order_id": {
+                            "type": "string",
+                            "description": "The order ID to get ETA for.",
+                        }
+                    },
+                    "required": ["order_id"],
                 },
             },
         },

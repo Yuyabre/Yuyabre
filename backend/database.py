@@ -13,6 +13,7 @@ from models import (
     Household,
     UserInventory,
 )
+from models.store import Store, StoreInventory
 
 
 class Database:
@@ -37,6 +38,8 @@ class Database:
                     User,
                     Household,
                     UserInventory,
+                    Store,
+                    StoreInventory,
                 ]
             )
             
